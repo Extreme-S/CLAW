@@ -2,22 +2,29 @@
 
 ## 1. 系统概览
 
-OpenClaw 是一套私有部署的个人 AI 助手系统，以 Mac Mini 作为中心服务器，统一管理对话、数据和日志。用户通过多种客户端（桌面小电视、飞书机器人）与 AI 交互，所有请求汇聚到服务端处理。
+OpenClaw 是一套私有部署的个人 AI 助手系统，采用 **Client-Server 架构**：
+
+- **Server（CLAW 服务端）**：部署在 Mac Mini 上，承载全部 AI 推理、对话管理、数据存储和插件执行
+- **Client（桌面宠物等）**：运行在用户的其他电脑上，作为轻量级交互入口，通过网络连接服务端
+
+用户通过多种客户端（CLAW 桌面宠物、飞书机器人、Web 仪表盘）与 AI 交互，所有请求汇聚到 Mac Mini 服务端处理。
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        用户端 (Clients)                         │
+│               用户端 Clients（运行在其他电脑/设备）               │
 │                                                                 │
 │   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│   │  Little-TV    │    │  飞书机器人   │    │  未来扩展     │      │
-│   │  桌面客户端   │    │  Feishu Bot  │    │  Web/Mobile  │      │
+│   │  CLAW 桌面宠物│    │  飞书机器人   │    │  Web 仪表盘   │      │
+│   │  Desktop Pet │    │  Feishu Bot  │    │  Dashboard   │      │
+│   │  (PyQt6)     │    │              │    │              │      │
 │   └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
 │          │                   │                   │              │
 └──────────┼───────────────────┼───────────────────┼──────────────┘
-           │ HTTP/WebSocket    │ Webhook/API       │
+           │ HTTP/WebSocket    │ Webhook/API       │ HTTP
+           │ (局域网/Tailscale)│                   │
            ▼                   ▼                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Mac Mini 服务端 (Server)                      │
+│               Mac Mini 服务端 CLAW Server                       │
 │                                                                 │
 │   ┌─────────────────────────────────────────────────────────┐   │
 │   │                    API Gateway                          │   │
@@ -108,20 +115,20 @@ openclaw/
 │       ├── test_plugins.py
 │       └── test_api.py
 │
-├── clients/                         # ===== 客户端 =====
-│   ├── desktop/                     # Little-TV 桌面客户端
+├── clients/                         # ===== 客户端（运行在用户的其他电脑上）=====
+│   ├── desktop/                     # CLAW 桌面宠物客户端
 │   │   ├── main.py
 │   │   ├── requirements.txt
 │   │   ├── core/
 │   │   │   ├── __init__.py
-│   │   │   ├── api_client.py        # 与服务端通信的 HTTP/WS 客户端
-│   │   │   ├── config_manager.py    # 本地配置（服务器地址、快捷键等）
+│   │   │   ├── api_client.py        # 与 Mac Mini 服务端通信的 HTTP/WS 客户端
+│   │   │   ├── config_manager.py    # 本地配置（服务器地址、Token、快捷键等）
 │   │   │   ├── event_bus.py
 │   │   │   └── macos_topmost.py
 │   │   ├── ui/
 │   │   │   ├── __init__.py
-│   │   │   ├── tv_widget.py         # 桌面小电视（保持现有）
-│   │   │   ├── chat_panel.py        # 聊天面板（改为调服务端 API）
+│   │   │   ├── tv_widget.py         # 赛博朋克 CLAW 桌面宠物（与 Web Logo 一致）
+│   │   │   ├── chat_panel.py        # 聊天面板（通过 api_client 调服务端）
 │   │   │   ├── news_panel.py
 │   │   │   ├── bubble_toast.py
 │   │   │   ├── tray_icon.py
@@ -340,9 +347,9 @@ CREATE TABLE logs (
 
 ## 4. 客户端设计
 
-### 4.1 Desktop Client（Little-TV 桌面客户端）
+### 4.1 Desktop Client（CLAW 桌面宠物客户端）
 
-重构为**瘦客户端**，所有 AI 逻辑移至服务端，客户端只负责 UI 和交互。
+桌面宠物运行在**用户的其他电脑**上（如 MacBook、工作站等），作为**瘦客户端**通过局域网/Tailscale 连接 Mac Mini 服务端。客户端只负责 UI 渲染和交互，所有 AI 推理、对话管理、数据存储均由服务端完成。
 
 ```python
 # clients/desktop/core/api_client.py
@@ -377,16 +384,28 @@ class OpenClawClient:
         ...
 ```
 
-**改动点**（相对现有 Little-TV）：
+**改动点**（相对现有代码）：
 
 | 模块 | 现状 | 重构后 |
 |---|---|---|
-| `chat_panel.py` | 直接调 OpenAI/Claude SDK | 通过 `OpenClawClient` 调服务端 |
-| `ai_chat.py` | 客户端内置 Provider | 删除，逻辑移至服务端 |
-| `news_collector.py` | 客户端采集 | 移至服务端插件，客户端只展示 |
-| `water_reminder.py` | 客户端定时器 | 服务端调度，推送到客户端 |
-| 新增 `api_client.py` | — | 统一的服务端通信层 |
+| `tv_widget.py` | B站小电视形象 | 赛博朋克 CLAW Logo（已完成） |
+| `chat_panel.py` | 直接调 OpenAI/Claude SDK | 通过 `OpenClawClient` 调 Mac Mini 服务端 |
+| `ai_chat.py` | 客户端内置 Provider | 删除，AI 逻辑移至服务端 |
+| `news_collector.py` | 客户端本地采集 | 移至服务端插件，客户端只展示 |
+| `water_reminder.py` | 客户端定时器 | 服务端调度，通过 WebSocket 推送到客户端 |
+| 新增 `api_client.py` | — | 统一的 Mac Mini 服务端通信层 |
 | 新增 `hotkey.py` | — | 全局快捷键（Cmd+Shift+Space） |
+
+**网络拓扑**：
+```
+用户电脑 (MacBook/PC)              Mac Mini (常驻服务器)
+┌────────────────────┐            ┌────────────────────┐
+│  CLAW 桌面宠物      │───HTTP/WS──→│  CLAW Server       │
+│  (PyQt6 瘦客户端)   │←──推送─────│  (FastAPI)         │
+└────────────────────┘            └────────────────────┘
+  局域网: http://mac-mini.local:8000
+  外网:   通过 Tailscale 组网
+```
 
 ### 4.2 Feishu Bot（飞书机器人）
 
@@ -467,9 +486,10 @@ class FeishuAdapter:
 ## 6. 数据流全景
 
 ```
+ 用户电脑/设备                          Mac Mini 服务端
 ┌──────────┐  用户输入   ┌──────────────┐  HTTP/WS  ┌──────────────┐
-│ Little-TV ├───────────→│ API Gateway  ├─────────→│ Chat Engine  │
-│ / 飞书    │            │ (认证/路由)   │          │ (上下文组装)  │
+│CLAW 桌面宠├───────────→│ API Gateway  ├─────────→│ Chat Engine  │
+│物 / 飞书  │  (网络)    │ (认证/路由)   │          │ (上下文组装)  │
 └──────────┘            └──────────────┘          └──────┬───────┘
      ▲                                                    │
      │                                          ┌─────────▼─────────┐
@@ -498,7 +518,9 @@ class FeishuAdapter:
 
 ## 7. 部署方案
 
-### Mac Mini 服务端
+### Mac Mini 服务端（CLAW Server）
+
+常驻运行在 Mac Mini 上，开机自启，对外提供 API 服务。
 
 ```bash
 # 1. 安装依赖
@@ -515,26 +537,32 @@ cp config.example.yaml config.yaml
 # 4. 启动服务
 uvicorn main:app --host 0.0.0.0 --port 8000
 
-# 5. （可选）用 systemd/launchd 设为开机自启
+# 5. 用 launchd 设为开机自启（推荐）
 ```
 
-### 内网访问
+### 网络连接
 
 ```yaml
-# 局域网直连（推荐）
+# 局域网直连（同一网络下的其他电脑）
 server_url: "http://mac-mini.local:8000"
 
-# 外网访问（飞书 Webhook 需要）
-# 方案 A：frp 内网穿透
-# 方案 B：Tailscale 组网（推荐，零配置 VPN）
+# 外网访问（不在同一局域网时）
+# 方案 A：Tailscale 组网（推荐，零配置 P2P VPN，所有设备加入同一虚拟网络）
+# 方案 B：frp 内网穿透
 # 方案 C：Cloudflare Tunnel
+# 飞书 Webhook 需要外网可达，推荐 Tailscale + Funnel 或 Cloudflare Tunnel
 ```
 
-### Desktop 客户端
+### 桌面宠物客户端（运行在其他电脑上）
+
+在用户的 MacBook/PC 上安装运行，连接 Mac Mini 服务端。
 
 ```bash
 cd openclaw/clients/desktop
 pip install -r requirements.txt
+
+# 首次运行需配置服务端地址
+# config.yaml → server_url: "http://mac-mini.local:8000"
 python main.py
 ```
 
@@ -557,11 +585,13 @@ python main.py
 - [ ] SQLite 存储层
 - [ ] WebSocket 流式接口
 
-### Phase 2：桌面客户端重构（1 周）
-- [ ] 新增 `api_client.py`，替换直接 SDK 调用
+### Phase 2：桌面宠物客户端重构（1 周）
+- [x] 桌面宠物形象更新为赛博朋克 CLAW Logo（与 Web 端一致）
+- [ ] 新增 `api_client.py`，替换直接 SDK 调用，连接 Mac Mini 服务端
 - [ ] ChatPanel 改为调服务端 API
 - [ ] 会话管理（新建/切换/历史）
 - [ ] 全局快捷键
+- [ ] 客户端打包分发（支持在多台电脑上安装）
 
 ### Phase 3：飞书机器人接入（1 周）
 - [ ] 飞书开放平台应用配置
