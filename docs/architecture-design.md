@@ -1,22 +1,23 @@
-# OpenClaw — 私人 AI 助手系统架构设计
+# CLAW — 私人 AI 助手系统架构设计
 
 ## 1. 系统概览
 
-OpenClaw 是一套私有部署的个人 AI 助手系统，采用 **Client-Server 架构**：
+CLAW 是一套私有部署的个人 AI 助手系统，采用 **Client-Server 架构**，分为两个独立项目：
 
-- **Server（CLAW 服务端）**：部署在 Mac Mini 上，承载全部 AI 推理、对话管理、数据存储和插件执行
-- **Client（桌面宠物等）**：运行在用户的其他电脑上，作为轻量级交互入口，通过网络连接服务端
+- **Server — [OpenClaw](https://github.com/Extreme-S/OpenClaw)**：部署在 Mac Mini 上，承载全部 AI 推理、对话管理、数据存储和插件执行
+- **Client — [Little-CLAW](https://github.com/Extreme-S/CLAW)**（本仓库）：桌面宠物客户端，运行在用户的其他电脑上，作为轻量级交互入口
 
-用户通过多种客户端（CLAW 桌面宠物、飞书机器人、Web 仪表盘）与 AI 交互，所有请求汇聚到 Mac Mini 服务端处理。
+用户通过多种客户端（CLAW 桌面宠物、飞书机器人、Web 仪表盘）与 AI 交互，所有请求通过网络汇聚到 Mac Mini 上的 OpenClaw 服务端处理。
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│               用户端 Clients（运行在其他电脑/设备）               │
+│           用户端 Clients（运行在用户的其他电脑/设备）              │
 │                                                                 │
 │   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│   │  CLAW 桌面宠物│    │  飞书机器人   │    │  Web 仪表盘   │      │
-│   │  Desktop Pet │    │  Feishu Bot  │    │  Dashboard   │      │
-│   │  (PyQt6)     │    │              │    │              │      │
+│   │ Little-CLAW   │    │  飞书机器人   │    │  Web 仪表盘   │      │
+│   │ 桌面宠物客户端│    │  Feishu Bot  │    │  Dashboard   │      │
+│   │ (PyQt6)      │    │              │    │              │      │
+│   │ 本仓库        │    │              │    │              │      │
 │   └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
 │          │                   │                   │              │
 └──────────┼───────────────────┼───────────────────┼──────────────┘
@@ -24,7 +25,7 @@ OpenClaw 是一套私有部署的个人 AI 助手系统，采用 **Client-Server
            │ (局域网/Tailscale)│                   │
            ▼                   ▼                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│               Mac Mini 服务端 CLAW Server                       │
+│          Mac Mini 服务端 — OpenClaw (独立仓库)                    │
 │                                                                 │
 │   ┌─────────────────────────────────────────────────────────┐   │
 │   │                    API Gateway                          │   │
@@ -55,95 +56,106 @@ OpenClaw 是一套私有部署的个人 AI 助手系统，采用 **Client-Server
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 2. 项目结构（重构后）
+## 2. 项目结构
+
+系统拆分为两个独立仓库：
+
+### 2.1 服务端 — OpenClaw（独立仓库，部署在 Mac Mini）
 
 ```
-openclaw/
-├── server/                          # ===== 服务端（运行在 Mac Mini）=====
-│   ├── main.py                      # FastAPI 入口
-│   ├── requirements.txt
-│   ├── config.yaml                  # 服务端配置
-│   │
-│   ├── api/                         # API 层
-│   │   ├── __init__.py
-│   │   ├── routes_chat.py           # POST /chat, WebSocket /chat/stream
-│   │   ├── routes_tools.py          # POST /tools/execute
-│   │   ├── routes_history.py        # GET /history, GET /sessions
-│   │   ├── routes_health.py         # GET /health
-│   │   ├── middleware.py            # 认证、限流、日志中间件
-│   │   └── deps.py                  # 依赖注入
-│   │
-│   ├── core/                        # 核心服务
-│   │   ├── __init__.py
-│   │   ├── chat_engine.py           # 多轮对话引擎（上下文管理、消息裁剪）
-│   │   ├── ai_router.py             # AI 模型路由（OpenAI/Claude/本地模型切换）
-│   │   ├── memory.py                # 长期记忆（用户画像、偏好、知识库）
-│   │   ├── tool_executor.py         # Function Calling 工具执行器
-│   │   ├── plugin_manager.py        # 插件加载与管理
-│   │   └── scheduler.py             # 定时任务调度（提醒、新闻、日报）
-│   │
-│   ├── plugins/                     # 内置插件
-│   │   ├── __init__.py
-│   │   ├── base.py                  # 插件基类
-│   │   ├── water_reminder.py        # 喝水提醒
-│   │   ├── news_collector.py        # 新闻搜集 + AI 摘要
-│   │   ├── weather.py               # 天气查询
-│   │   ├── translator.py            # 翻译
-│   │   ├── reminder.py              # 自定义提醒（"3点提醒我开会"）
-│   │   └── daily_briefing.py        # 每日简报
-│   │
-│   ├── storage/                     # 存储层
-│   │   ├── __init__.py
-│   │   ├── database.py              # SQLite 管理（对话、会话、用户数据）
-│   │   ├── models.py                # ORM 模型定义
-│   │   ├── vector_store.py          # 向量存储（FAISS，用于语义检索记忆）
-│   │   └── file_store.py            # 文件存储管理
-│   │
-│   ├── adapters/                    # 客户端适配器
-│   │   ├── __init__.py
-│   │   ├── feishu_bot.py            # 飞书机器人 Webhook 适配
-│   │   └── feishu_events.py         # 飞书事件回调处理
-│   │
-│   ├── data/                        # 运行时数据
-│   │   ├── openclaw.db              # SQLite 数据库
-│   │   ├── vectors/                 # FAISS 向量索引
-│   │   ├── logs/                    # 日志文件
-│   │   └── uploads/                 # 用户上传文件
-│   │
-│   └── tests/
-│       ├── test_chat_engine.py
-│       ├── test_plugins.py
-│       └── test_api.py
+openclaw/                               # github.com/Extreme-S/OpenClaw
+├── main.py                             # FastAPI 入口
+├── requirements.txt
+├── config.yaml                         # 服务端配置（API Key、Token 等）
 │
-├── clients/                         # ===== 客户端（运行在用户的其他电脑上）=====
-│   ├── desktop/                     # CLAW 桌面宠物客户端
-│   │   ├── main.py
-│   │   ├── requirements.txt
-│   │   ├── core/
-│   │   │   ├── __init__.py
-│   │   │   ├── api_client.py        # 与 Mac Mini 服务端通信的 HTTP/WS 客户端
-│   │   │   ├── config_manager.py    # 本地配置（服务器地址、Token、快捷键等）
-│   │   │   ├── event_bus.py
-│   │   │   └── macos_topmost.py
-│   │   ├── ui/
-│   │   │   ├── __init__.py
-│   │   │   ├── tv_widget.py         # 赛博朋克 CLAW 桌面宠物（与 Web Logo 一致）
-│   │   │   ├── chat_panel.py        # 聊天面板（通过 api_client 调服务端）
-│   │   │   ├── news_panel.py
-│   │   │   ├── bubble_toast.py
-│   │   │   ├── tray_icon.py
-│   │   │   └── settings_dialog.py
-│   │   └── features/
-│   │       └── hotkey.py            # 全局快捷键
-│   │
-│   └── feishu/                      # 飞书 Bot 配置说明
-│       └── README.md
+├── api/                                # API 层
+│   ├── __init__.py
+│   ├── routes_chat.py                  # POST /chat, WebSocket /chat/stream
+│   ├── routes_tools.py                 # POST /tools/execute
+│   ├── routes_history.py               # GET /history, GET /sessions
+│   ├── routes_health.py                # GET /health
+│   ├── middleware.py                   # 认证、限流、日志中间件
+│   └── deps.py                         # 依赖注入
+│
+├── core/                               # 核心服务
+│   ├── __init__.py
+│   ├── chat_engine.py                  # 多轮对话引擎（上下文管理、消息裁剪）
+│   ├── ai_router.py                    # AI 模型路由（OpenAI/Claude/本地模型切换）
+│   ├── memory.py                       # 长期记忆（用户画像、偏好、知识库）
+│   ├── tool_executor.py                # Function Calling 工具执行器
+│   ├── plugin_manager.py               # 插件加载与管理
+│   └── scheduler.py                    # 定时任务调度（提醒、新闻、日报）
+│
+├── plugins/                            # 内置插件
+│   ├── __init__.py
+│   ├── base.py                         # 插件基类
+│   ├── water_reminder.py               # 喝水提醒
+│   ├── news_collector.py               # 新闻搜集 + AI 摘要
+│   ├── weather.py                      # 天气查询
+│   ├── translator.py                   # 翻译
+│   ├── reminder.py                     # 自定义提醒（"3点提醒我开会"）
+│   └── daily_briefing.py               # 每日简报
+│
+├── storage/                            # 存储层
+│   ├── __init__.py
+│   ├── database.py                     # SQLite 管理（对话、会话、用户数据）
+│   ├── models.py                       # ORM 模型定义
+│   ├── vector_store.py                 # 向量存储（FAISS，用于语义检索记忆）
+│   └── file_store.py                   # 文件存储管理
+│
+├── adapters/                           # 客户端适配器
+│   ├── __init__.py
+│   ├── feishu_bot.py                   # 飞书机器人 Webhook 适配
+│   └── feishu_events.py                # 飞书事件回调处理
+│
+├── data/                               # 运行时数据（gitignore）
+│   ├── openclaw.db                     # SQLite 数据库
+│   ├── vectors/                        # FAISS 向量索引
+│   ├── logs/                           # 日志文件
+│   └── uploads/                        # 用户上传文件
+│
+└── tests/
+    ├── test_chat_engine.py
+    ├── test_plugins.py
+    └── test_api.py
+```
+
+### 2.2 客户端 — Little-CLAW（本仓库，运行在用户的其他电脑上）
+
+```
+little-claw/                            # github.com/Extreme-S/CLAW（本仓库）
+├── main.py                             # PyQt6 入口
+├── requirements.txt
+│
+├── core/
+│   ├── __init__.py
+│   ├── api_client.py                   # 与 OpenClaw 服务端通信的 HTTP/WS 客户端
+│   ├── config_manager.py               # 本地配置（服务器地址、Token、快捷键等）
+│   ├── event_bus.py
+│   └── macos_topmost.py
+│
+├── ui/
+│   ├── __init__.py
+│   ├── tv_widget.py                    # 赛博朋克 CLAW 桌面宠物（与 Web Logo 一致）
+│   ├── chat_panel.py                   # 聊天面板（通过 api_client 调 OpenClaw）
+│   ├── news_panel.py
+│   ├── bubble_toast.py
+│   ├── tray_icon.py
+│   └── settings_dialog.py
+│
+├── features/
+│   └── hotkey.py                       # 全局快捷键
+│
+├── web/                                # Web 仪表盘（静态页面）
+│   ├── index.html
+│   ├── css/
+│   └── js/
 │
 └── docs/
-    └── architecture-design.md       # 本文档
+    └── architecture-design.md          # 本文档
 ```
 
-## 3. 服务端设计
+## 3. 服务端设计（OpenClaw）
 
 ### 3.1 API Gateway
 
@@ -345,14 +357,14 @@ CREATE TABLE logs (
 );
 ```
 
-## 4. 客户端设计
+## 4. 客户端设计（Little-CLAW / 本仓库）
 
 ### 4.1 Desktop Client（CLAW 桌面宠物客户端）
 
-桌面宠物运行在**用户的其他电脑**上（如 MacBook、工作站等），作为**瘦客户端**通过局域网/Tailscale 连接 Mac Mini 服务端。客户端只负责 UI 渲染和交互，所有 AI 推理、对话管理、数据存储均由服务端完成。
+桌面宠物运行在**用户的其他电脑**上（如 MacBook、工作站等），作为**瘦客户端**通过局域网/Tailscale 连接 Mac Mini 上的 OpenClaw 服务端。客户端只负责 UI 渲染和交互，所有 AI 推理、对话管理、数据存储均由 OpenClaw 完成。
 
 ```python
-# clients/desktop/core/api_client.py
+# core/api_client.py
 
 class OpenClawClient:
     """与 OpenClaw 服务端通信。"""
@@ -389,19 +401,20 @@ class OpenClawClient:
 | 模块 | 现状 | 重构后 |
 |---|---|---|
 | `tv_widget.py` | B站小电视形象 | 赛博朋克 CLAW Logo（已完成） |
-| `chat_panel.py` | 直接调 OpenAI/Claude SDK | 通过 `OpenClawClient` 调 Mac Mini 服务端 |
-| `ai_chat.py` | 客户端内置 Provider | 删除，AI 逻辑移至服务端 |
-| `news_collector.py` | 客户端本地采集 | 移至服务端插件，客户端只展示 |
-| `water_reminder.py` | 客户端定时器 | 服务端调度，通过 WebSocket 推送到客户端 |
-| 新增 `api_client.py` | — | 统一的 Mac Mini 服务端通信层 |
+| `chat_panel.py` | 直接调 OpenAI/Claude SDK | 通过 `OpenClawClient` 调 OpenClaw 服务端 |
+| `ai_chat.py` | 客户端内置 Provider | 删除，AI 逻辑移至 OpenClaw |
+| `news_collector.py` | 客户端本地采集 | 移至 OpenClaw 插件，客户端只展示 |
+| `water_reminder.py` | 客户端定时器 | OpenClaw 调度，通过 WebSocket 推送到客户端 |
+| 新增 `api_client.py` | — | 统一的 OpenClaw 服务端通信层 |
 | 新增 `hotkey.py` | — | 全局快捷键（Cmd+Shift+Space） |
 
 **网络拓扑**：
 ```
 用户电脑 (MacBook/PC)              Mac Mini (常驻服务器)
 ┌────────────────────┐            ┌────────────────────┐
-│  CLAW 桌面宠物      │───HTTP/WS──→│  CLAW Server       │
-│  (PyQt6 瘦客户端)   │←──推送─────│  (FastAPI)         │
+│  Little-CLAW        │───HTTP/WS──→│  OpenClaw 服务端   │
+│  桌面宠物客户端      │←──推送─────│  (FastAPI)         │
+│  (PyQt6 瘦客户端)   │            │                    │
 └────────────────────┘            └────────────────────┘
   局域网: http://mac-mini.local:8000
   外网:   通过 Tailscale 组网
@@ -414,17 +427,17 @@ class OpenClawClient:
 ```
 飞书消息流：
 
-用户 → 飞书 App → 飞书开放平台 → Webhook → OpenClaw Server
+用户 → 飞书 App → 飞书开放平台 → Webhook → OpenClaw 服务端
                                                     │
                                                     ▼
                                               Chat Engine
                                                     │
                                                     ▼
-OpenClaw Server → 飞书 API (发送消息) → 飞书 App → 用户
+OpenClaw 服务端 → 飞书 API (发送消息) → 飞书 App → 用户
 ```
 
 ```python
-# server/adapters/feishu_bot.py
+# openclaw/adapters/feishu_bot.py
 
 class FeishuAdapter:
     """飞书事件处理适配器。"""
@@ -518,26 +531,29 @@ class FeishuAdapter:
 
 ## 7. 部署方案
 
-### Mac Mini 服务端（CLAW Server）
+### Mac Mini — OpenClaw 服务端
 
-常驻运行在 Mac Mini 上，开机自启，对外提供 API 服务。
+从 OpenClaw 仓库部署，常驻运行在 Mac Mini 上，开机自启。
 
 ```bash
-# 1. 安装依赖
-cd openclaw/server
+# 1. 克隆 OpenClaw 服务端仓库
+git clone https://github.com/Extreme-S/OpenClaw.git
+cd openclaw
+
+# 2. 安装依赖
 pip install -r requirements.txt
 
-# 2. 初始化数据库
+# 3. 初始化数据库
 python -m storage.database init
 
-# 3. 配置
+# 4. 配置
 cp config.example.yaml config.yaml
-# 编辑 config.yaml：填写 API Key、飞书凭证、Token 等
+# 编辑 config.yaml：填写 API Key、飞书凭证、客户端 Token 等
 
-# 4. 启动服务
+# 5. 启动服务
 uvicorn main:app --host 0.0.0.0 --port 8000
 
-# 5. 用 launchd 设为开机自启（推荐）
+# 6. 用 launchd 设为开机自启（推荐）
 ```
 
 ### 网络连接
@@ -553,16 +569,22 @@ server_url: "http://mac-mini.local:8000"
 # 飞书 Webhook 需要外网可达，推荐 Tailscale + Funnel 或 Cloudflare Tunnel
 ```
 
-### 桌面宠物客户端（运行在其他电脑上）
+### 其他电脑 — Little-CLAW 桌面宠物客户端
 
-在用户的 MacBook/PC 上安装运行，连接 Mac Mini 服务端。
+从本仓库 (CLAW) 部署，在用户的 MacBook/PC 上安装运行，连接 Mac Mini 上的 OpenClaw。
 
 ```bash
-cd openclaw/clients/desktop
+# 1. 克隆客户端仓库
+git clone https://github.com/Extreme-S/CLAW.git
+cd CLAW
+
+# 2. 安装依赖
 pip install -r requirements.txt
 
-# 首次运行需配置服务端地址
+# 3. 首次运行需配置 OpenClaw 服务端地址
 # config.yaml → server_url: "http://mac-mini.local:8000"
+
+# 4. 启动桌面宠物
 python main.py
 ```
 
@@ -571,35 +593,43 @@ python main.py
 | 层面 | 措施 |
 |---|---|
 | 传输 | 局域网内 HTTP 即可；外网必须 HTTPS（Tailscale 自带加密） |
-| 认证 | Bearer Token，服务端校验。Token 存储在客户端本地加密配置 |
-| API Key | 所有 AI API Key 只存在服务端 config.yaml，客户端不接触 |
-| 数据 | 全部存储在 Mac Mini 本地，不经过第三方云服务（除 AI API 调用） |
+| 认证 | Bearer Token，OpenClaw 服务端校验。Token 存储在客户端本地加密配置 |
+| API Key | 所有 AI API Key 只存在 OpenClaw 的 config.yaml，客户端不接触 |
+| 数据 | 全部存储在 Mac Mini 本地（OpenClaw），不经过第三方云服务（除 AI API 调用） |
 | 日志 | 操作日志记录到 SQLite，可审计追溯 |
 
-## 9. 迁移路线（从现有 Little-TV 到 OpenClaw）
+## 9. 开发路线
 
-### Phase 1：服务端搭建（1-2 周）
-- [ ] FastAPI 骨架 + 认证中间件
+### Phase 1：OpenClaw 服务端搭建（1-2 周）
+> 仓库：`Extreme-S/OpenClaw`，部署在 Mac Mini
+
+- [ ] 创建 OpenClaw 仓库，FastAPI 骨架 + 认证中间件
 - [ ] Chat Engine（多轮对话 + 消息持久化）
 - [ ] AI Router（OpenAI + Claude）
 - [ ] SQLite 存储层
 - [ ] WebSocket 流式接口
 
-### Phase 2：桌面宠物客户端重构（1 周）
+### Phase 2：Little-CLAW 客户端对接（1 周）
+> 仓库：`Extreme-S/CLAW`（本仓库），运行在其他电脑
+
 - [x] 桌面宠物形象更新为赛博朋克 CLAW Logo（与 Web 端一致）
-- [ ] 新增 `api_client.py`，替换直接 SDK 调用，连接 Mac Mini 服务端
-- [ ] ChatPanel 改为调服务端 API
+- [ ] 新增 `api_client.py`，替换直接 SDK 调用，连接 OpenClaw 服务端
+- [ ] ChatPanel 改为调 OpenClaw API
 - [ ] 会话管理（新建/切换/历史）
 - [ ] 全局快捷键
 - [ ] 客户端打包分发（支持在多台电脑上安装）
 
 ### Phase 3：飞书机器人接入（1 周）
+> 在 OpenClaw 服务端实现适配器
+
 - [ ] 飞书开放平台应用配置
 - [ ] Webhook 事件处理适配器
 - [ ] 消息回复（支持富文本/Markdown）
 - [ ] 内网穿透 or Tailscale
 
 ### Phase 4：智能增强（持续迭代）
+> OpenClaw 服务端插件扩展
+
 - [ ] 插件系统 + Function Calling
 - [ ] 长期记忆 + 向量检索
 - [ ] 每日简报、天气、提醒等插件
@@ -609,11 +639,11 @@ python main.py
 
 | 组件 | 技术 | 理由 |
 |---|---|---|
-| 服务端框架 | FastAPI | 异步、高性能、自动生成 API 文档 |
+| 服务端框架 | FastAPI (OpenClaw) | 异步、高性能、自动生成 API 文档 |
 | 数据库 | SQLite | 轻量、零运维、私有部署够用 |
 | 向量存储 | FAISS | 本地部署、无需额外服务 |
 | 实时通信 | WebSocket | 原生支持流式推送 |
-| 桌面 UI | PyQt6 | 已有基础，跨平台 |
+| 桌面 UI | PyQt6 (Little-CLAW) | 已有基础，跨平台 |
 | 飞书集成 | 飞书开放平台 SDK | 官方支持，文档完善 |
 | 组网 | Tailscale | 零配置 P2P VPN，安全免运维 |
 | AI 后端 | OpenAI + Claude + Ollama | 多模型灵活切换 |
