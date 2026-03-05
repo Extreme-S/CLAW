@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLAW | AI 私人助手</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- ========== NAV ========== -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <div class="nav-logo">
+                <svg width="28" height="28" viewBox="0 0 100 100" class="claw-icon-sm">
+                    <!-- 机械爪外壳 -->
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#00e5ff" stroke-width="2.5" opacity="0.6"/>
+                    <circle cx="50" cy="50" r="35" fill="#0a1628" stroke="#00e5ff" stroke-width="1.5"/>
+                    <!-- 爪指 - 三指机械爪 -->
+                    <path d="M50 15 L44 32 L50 28 L56 32 Z" fill="#00e5ff" opacity="0.9"/>
+                    <path d="M20 65 L35 55 L33 50 L25 58 Z" fill="#00e5ff" opacity="0.9"/>
+                    <path d="M80 65 L65 55 L67 50 L75 58 Z" fill="#00e5ff" opacity="0.9"/>
+                    <!-- 中心眼/核心 -->
+                    <circle cx="50" cy="50" r="10" fill="#0a1628" stroke="#00e5ff" stroke-width="2"/>
+                    <circle cx="50" cy="50" r="4" fill="#00e5ff">
+                        <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+            </div>
+            <span class="nav-title">CLAW</span>
+        </div>
+        <div class="nav-links">
+            <a href="#hero" class="nav-link active" data-section="hero">首页</a>
+            <a href="#logos" class="nav-link" data-section="logos">Logo</a>
+            <a href="#worklog" class="nav-link" data-section="worklog">工作日志</a>
+            <a href="#moments" class="nav-link" data-section="moments">动态</a>
+            <a href="#chat" class="nav-link" data-section="chat">对话</a>
+        </div>
+        <div class="nav-actions">
+            <button class="lang-toggle" id="langToggle">
+                <span class="lang-opt active">中文</span>
+                <span class="lang-opt">EN</span>
+            </button>
+            <div class="status-dot online"></div>
+        </div>
+    </nav>
+
+    <!-- ========== HERO ========== -->
+    <section id="hero" class="hero">
+        <div class="hero-glow"></div>
+        <div class="hero-content">
+            <div class="hero-avatar" id="heroAvatar">
+                <svg width="220" height="220" viewBox="0 0 220 220" class="claw-hero-svg">
+                    <defs>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                        </filter>
+                        <linearGradient id="clawGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00e5ff"/>
+                            <stop offset="100%" style="stop-color:#7c4dff"/>
+                        </linearGradient>
+                        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:0.8"/>
+                            <stop offset="50%" style="stop-color:#7c4dff;stop-opacity:0.4"/>
+                            <stop offset="100%" style="stop-color:#00e5ff;stop-opacity:0.8"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- 最外层旋转虚线环 -->
+                    <circle cx="110" cy="110" r="106" fill="none" stroke="url(#ringGrad)" stroke-width="1" stroke-dasharray="6 10" opacity="0.3">
+                        <animateTransform attributeName="transform" type="rotate" values="0 110 110;360 110 110" dur="25s" repeatCount="indefinite"/>
+                    </circle>
+
+                    <!-- 外圆主环 -->
+                    <circle cx="110" cy="110" r="96" fill="none" stroke="url(#clawGrad)" stroke-width="2" filter="url(#glow)"/>
+
+                    <!-- 内圆虚线（反向旋转） -->
+                    <circle cx="110" cy="110" r="89" fill="none" stroke="url(#ringGrad)" stroke-width="0.8" stroke-dasharray="4 8" opacity="0.25">
+                        <animateTransform attributeName="transform" type="rotate" values="360 110 110;0 110 110" dur="18s" repeatCount="indefinite"/>
+                    </circle>
+
+                    <!-- 六边形底座（放大，居中偏上，留出文字空间） -->
+                    <polygon points="110,20 164,51 164,113 110,144 56,113 56,51" fill="#0a1628" stroke="url(#clawGrad)" stroke-width="1.5" filter="url(#glow)"/>
+
+                    <!-- 电路装饰线 -->
+                    <line x1="76" y1="53" x2="76" y2="82" stroke="#00e5ff" stroke-width="0.7" opacity="0.2"/>
+                    <line x1="144" y1="53" x2="144" y2="82" stroke="#00e5ff" stroke-width="0.7" opacity="0.2"/>
+                    <line x1="76" y1="82" x2="92" y2="82" stroke="#00e5ff" stroke-width="0.7" opacity="0.2"/>
+                    <line x1="144" y1="82" x2="128" y2="82" stroke="#00e5ff" stroke-width="0.7" opacity="0.2"/>
+
+                    <!-- 三指机械爪（放大） -->
+                    <g filter="url(#glow)">
+                        <!-- 上爪 -->
+                        <path d="M110 30 L101 57 L110 50 L119 57 Z" fill="url(#clawGrad)" opacity="0.95"/>
+                        <!-- 左下爪 -->
+                        <path d="M56 120 L78 102 L74 94 L59 109 Z" fill="url(#clawGrad)" opacity="0.95"/>
+                        <!-- 右下爪 -->
+                        <path d="M164 120 L142 102 L146 94 L161 109 Z" fill="url(#clawGrad)" opacity="0.95"/>
+                    </g>
+
+                    <!-- 关节连接点 -->
+                    <circle cx="110" cy="57" r="2.5" fill="#00e5ff" opacity="0.7"/>
+                    <circle cx="76" cy="99" r="2.5" fill="#00e5ff" opacity="0.7"/>
+                    <circle cx="144" cy="99" r="2.5" fill="#00e5ff" opacity="0.7"/>
+
+                    <!-- 连接线到中心 -->
+                    <line x1="110" y1="57" x2="110" y2="72" stroke="#00e5ff" stroke-width="1.2" opacity="0.4"/>
+                    <line x1="76" y1="99" x2="91" y2="91" stroke="#00e5ff" stroke-width="1.2" opacity="0.4"/>
+                    <line x1="144" y1="99" x2="129" y2="91" stroke="#00e5ff" stroke-width="1.2" opacity="0.4"/>
+
+                    <!-- 中心核心 - AI 之眼（放大） -->
+                    <circle cx="110" cy="88" r="20" fill="#0a1628" stroke="url(#clawGrad)" stroke-width="1.8"/>
+                    <circle cx="110" cy="88" r="12" fill="none" stroke="#00e5ff" stroke-width="0.8" opacity="0.4">
+                        <animate attributeName="r" values="12;16;12" dur="3s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="0.4;0.1;0.4" dur="3s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="110" cy="88" r="7" fill="#00e5ff" filter="url(#glow)">
+                        <animate attributeName="r" values="7;9;7" dur="2s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+
+                    <!-- CLAW 文字（六边形下方，圆环内部） -->
+                    <text x="110" y="172" text-anchor="middle" fill="#00e5ff" font-family="'Inter', monospace" font-size="13" font-weight="700" letter-spacing="6" opacity="0.7">CLAW</text>
+
+                    <!-- 圆环刻度标记 -->
+                    <g opacity="0.25">
+                        <line x1="110" y1="14" x2="110" y2="20" stroke="#00e5ff" stroke-width="1"/>
+                        <line x1="110" y1="200" x2="110" y2="206" stroke="#00e5ff" stroke-width="1"/>
+                        <line x1="14" y1="110" x2="20" y2="110" stroke="#00e5ff" stroke-width="1"/>
+                        <line x1="200" y1="110" x2="206" y2="110" stroke="#00e5ff" stroke-width="1"/>
+                    </g>
+                </svg>
+                <div class="hero-status">
+                    <div class="status-dot online pulse"></div>
+                    <span>在线</span>
+                </div>
+            </div>
+            <div class="hero-info">
+                <h1 class="hero-name">CLAW</h1>
+                <p class="hero-tagline">Cognitive Learning & Automated Wisdom</p>
+                <p class="hero-desc">你的赛博 AI 私人助手 — 7 x 24 守护，从对话到记忆，一切尽在掌控</p>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-num" id="statConversations">128</span>
+                        <span class="stat-label">对话</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-num" id="statDays">30</span>
+                        <span class="stat-label">在线天数</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-num" id="statPlugins">6</span>
+                        <span class="stat-label">插件</span>
+                    </div>
+                </div>
+                <div class="hero-actions">
+                    <a href="#chat" class="btn btn-primary">开始对话</a>
+                    <a href="#worklog" class="btn btn-outline">查看日志</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== LOGO SHOWCASE ========== -->
+    <section id="logos" class="section">
+        <div class="section-header">
+            <h2>Logo 方案对比</h2>
+        </div>
+        <div class="logo-showcase">
+
+            <!-- ===== 当前方案：圆形 + 六边形 + 三指爪 + AI 之眼 ===== -->
+            <div class="logo-card logo-card-current" id="logoCurrent">
+                <div class="logo-badge">当前使用</div>
+                <div class="logo-preview">
+                    <svg width="180" height="180" viewBox="0 0 220 220">
+                        <defs>
+                            <filter id="glowCur"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                            <linearGradient id="clawGradCur" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00e5ff"/>
+                                <stop offset="100%" style="stop-color:#7c4dff"/>
+                            </linearGradient>
+                        </defs>
+                        <!-- 外圆旋转虚线 -->
+                        <circle cx="110" cy="110" r="104" fill="none" stroke="#00e5ff" stroke-width="1" stroke-dasharray="6 10" opacity="0.25">
+                            <animateTransform attributeName="transform" type="rotate" values="0 110 110;360 110 110" dur="25s" repeatCount="indefinite"/>
+                        </circle>
+                        <!-- 外圆主环 -->
+                        <circle cx="110" cy="110" r="96" fill="none" stroke="url(#clawGradCur)" stroke-width="2" filter="url(#glowCur)"/>
+                        <!-- 内圆虚线（反向旋转） -->
+                        <circle cx="110" cy="110" r="89" fill="none" stroke="#00e5ff" stroke-width="0.8" stroke-dasharray="4 8" opacity="0.2">
+                            <animateTransform attributeName="transform" type="rotate" values="360 110 110;0 110 110" dur="18s" repeatCount="indefinite"/>
+                        </circle>
+                        <!-- 六边形底座（放大，居中偏上） -->
+                        <polygon points="110,20 164,51 164,113 110,144 56,113 56,51" fill="#0a1628" stroke="url(#clawGradCur)" stroke-width="1.5" filter="url(#glowCur)"/>
+                        <!-- 电路装饰线 -->
+                        <line x1="76" y1="53" x2="76" y2="82" stroke="#00e5ff" stroke-width="0.7" opacity="0.2"/>
+                        <line x1="144" y1="53" x2="144" y2="82" stroke="#00e5ff" stroke-width="0.7" opacity="0.2"/>
+                        <!-- 三指机械爪（放大） -->
+                        <g filter="url(#glowCur)">
+                            <path d="M110 30 L101 57 L110 50 L119 57 Z" fill="url(#clawGradCur)" opacity="0.95"/>
+                            <path d="M56 120 L78 102 L74 94 L59 109 Z" fill="url(#clawGradCur)" opacity="0.95"/>
+                            <path d="M164 120 L142 102 L146 94 L161 109 Z" fill="url(#clawGradCur)" opacity="0.95"/>
+                        </g>
+                        <!-- 关节连接点 -->
+                        <circle cx="110" cy="57" r="2.5" fill="#00e5ff" opacity="0.7"/>
+                        <circle cx="76" cy="99" r="2.5" fill="#00e5ff" opacity="0.7"/>
+                        <circle cx="144" cy="99" r="2.5" fill="#00e5ff" opacity="0.7"/>
+                        <!-- 连接线到中心 -->
+                        <line x1="110" y1="57" x2="110" y2="72" stroke="#00e5ff" stroke-width="1.2" opacity="0.4"/>
+                        <line x1="76" y1="99" x2="91" y2="91" stroke="#00e5ff" stroke-width="1.2" opacity="0.4"/>
+                        <line x1="144" y1="99" x2="129" y2="91" stroke="#00e5ff" stroke-width="1.2" opacity="0.4"/>
+                        <!-- 中心核心 - AI 之眼（放大） -->
+                        <circle cx="110" cy="88" r="20" fill="#0a1628" stroke="url(#clawGradCur)" stroke-width="1.8"/>
+                        <circle cx="110" cy="88" r="12" fill="none" stroke="#00e5ff" stroke-width="0.8" opacity="0.4">
+                            <animate attributeName="r" values="12;16;12" dur="3s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="110" cy="88" r="7" fill="#00e5ff" filter="url(#glowCur)">
+                            <animate attributeName="r" values="7;9;7" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <!-- CLAW 文字（六边形下方，圆环内部） -->
+                        <text x="110" y="172" text-anchor="middle" fill="#00e5ff" font-family="'Inter', monospace" font-size="13" font-weight="700" letter-spacing="6" opacity="0.7">CLAW</text>
+                        <!-- 刻度标记 -->
+                        <g opacity="0.25">
+                            <line x1="110" y1="14" x2="110" y2="20" stroke="#00e5ff" stroke-width="1"/>
+                            <line x1="110" y1="200" x2="110" y2="206" stroke="#00e5ff" stroke-width="1"/>
+                            <line x1="14" y1="110" x2="20" y2="110" stroke="#00e5ff" stroke-width="1"/>
+                            <line x1="200" y1="110" x2="206" y2="110" stroke="#00e5ff" stroke-width="1"/>
+                        </g>
+                    </svg>
+                </div>
+                <div class="logo-info">
+                    <h3>当前方案 · 六边形机械爪</h3>
+                    <p>旋转光环 + 六边形底座 + 三指机械爪 + AI 之眼核心。透明背景，三爪对应 CLAW 之名，六边形承载科技感，中心脉冲眼赋予灵魂。</p>
+                    <div class="logo-sizes">
+                        <svg width="48" height="48" viewBox="0 0 220 220">
+                            <circle cx="110" cy="110" r="95" fill="none" stroke="#00e5ff" stroke-width="3"/>
+                            <polygon points="110,20 164,51 164,113 110,144 56,113 56,51" fill="#0a1628" stroke="#00e5ff" stroke-width="2"/>
+                            <path d="M110 30 L101 57 L110 50 L119 57 Z" fill="#00e5ff" opacity="0.9"/>
+                            <path d="M56 120 L78 102 L74 94 L59 109 Z" fill="#00e5ff" opacity="0.9"/>
+                            <path d="M164 120 L142 102 L146 94 L161 109 Z" fill="#00e5ff" opacity="0.9"/>
+                            <circle cx="110" cy="88" r="16" fill="#0a1628" stroke="#00e5ff" stroke-width="2"/>
+                            <circle cx="110" cy="88" r="7" fill="#00e5ff"/>
+                        </svg>
+                        <svg width="32" height="32" viewBox="0 0 220 220">
+                            <circle cx="110" cy="110" r="95" fill="none" stroke="#00e5ff" stroke-width="5"/>
+                            <polygon points="110,20 164,51 164,113 110,144 56,113 56,51" fill="#0a1628" stroke="#00e5ff" stroke-width="3"/>
+                            <path d="M110 30 L101 57 L110 50 L119 57 Z" fill="#00e5ff"/>
+                            <path d="M56 120 L78 102 L74 94 L59 109 Z" fill="#00e5ff"/>
+                            <path d="M164 120 L142 102 L146 94 L161 109 Z" fill="#00e5ff"/>
+                            <circle cx="110" cy="88" r="18" fill="#0a1628" stroke="#00e5ff" stroke-width="3"/>
+                            <circle cx="110" cy="88" r="9" fill="#00e5ff"/>
+                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 220 220">
+                            <circle cx="110" cy="110" r="95" fill="none" stroke="#00e5ff" stroke-width="10"/>
+                            <polygon points="110,24 160,53 160,111 110,140 60,111 60,53" fill="#0a1628" stroke="#00e5ff" stroke-width="6"/>
+                            <path d="M110 34 L100 60 L110 53 L120 60 Z" fill="#00e5ff"/>
+                            <circle cx="110" cy="88" r="20" fill="#0a1628" stroke="#00e5ff" stroke-width="5"/>
+                            <circle cx="110" cy="88" r="12" fill="#00e5ff"/>
+                        </svg>
+                        <span class="size-label">48 / 32 / 16 px</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 方案 A：具象机械爪 ===== -->
+            <div class="logo-card" id="logoA">
+                <div class="logo-preview">
+                    <svg width="180" height="180" viewBox="0 0 200 200">
+                        <defs>
+                            <filter id="glowA">
+                                <feGaussianBlur stdDeviation="3" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <linearGradient id="metalA" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#c0d0e0"/>
+                                <stop offset="50%" style="stop-color:#8090a0"/>
+                                <stop offset="100%" style="stop-color:#c0d0e0"/>
+                            </linearGradient>
+                            <linearGradient id="cyanGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00e5ff"/>
+                                <stop offset="100%" style="stop-color:#7c4dff"/>
+                            </linearGradient>
+                        </defs>
+
+                        <!-- 底部光晕 -->
+                        <circle cx="100" cy="105" r="70" fill="url(#cyanGradA)" opacity="0.06"/>
+
+                        <!-- 掌心/手腕基座 -->
+                        <ellipse cx="100" cy="128" rx="32" ry="12" fill="#1a2540" stroke="#00e5ff" stroke-width="1.5" opacity="0.8"/>
+                        <rect x="82" y="105" width="36" height="28" rx="6" fill="#12203a" stroke="#00e5ff" stroke-width="1.2"/>
+                        <!-- 基座螺丝 -->
+                        <circle cx="88" cy="125" r="2" fill="#00e5ff" opacity="0.5"/>
+                        <circle cx="112" cy="125" r="2" fill="#00e5ff" opacity="0.5"/>
+                        <!-- 基座线条 -->
+                        <line x1="86" y1="112" x2="114" y2="112" stroke="#00e5ff" stroke-width="0.6" opacity="0.3"/>
+                        <line x1="86" y1="118" x2="114" y2="118" stroke="#00e5ff" stroke-width="0.6" opacity="0.3"/>
+
+                        <!-- ====== 猫爪垫 ====== -->
+                        <g filter="url(#glowA)">
+                            <!-- 大掌垫 (中间) -->
+                            <ellipse cx="100" cy="85" rx="18" ry="14" fill="#12203a" stroke="url(#cyanGradA)" stroke-width="2"/>
+                            <!-- 掌垫内光 -->
+                            <ellipse cx="100" cy="84" rx="10" ry="7" fill="#00e5ff" opacity="0.15"/>
+
+                            <!-- 四个趾垫 -->
+                            <!-- 左外趾 -->
+                            <ellipse cx="68" cy="62" rx="11" ry="13" fill="#12203a" stroke="#00e5ff" stroke-width="1.8" transform="rotate(-15 68 62)"/>
+                            <ellipse cx="68" cy="61" rx="6" ry="7" fill="#00e5ff" opacity="0.12" transform="rotate(-15 68 61)"/>
+                            <!-- 左内趾 -->
+                            <ellipse cx="82" cy="52" rx="10" ry="12" fill="#12203a" stroke="#00e5ff" stroke-width="1.8" transform="rotate(-5 82 52)"/>
+                            <ellipse cx="82" cy="51" rx="5.5" ry="6.5" fill="#00e5ff" opacity="0.12" transform="rotate(-5 82 51)"/>
+                            <!-- 右内趾 -->
+                            <ellipse cx="118" cy="52" rx="10" ry="12" fill="#12203a" stroke="#00e5ff" stroke-width="1.8" transform="rotate(5 118 52)"/>
+                            <ellipse cx="118" cy="51" rx="5.5" ry="6.5" fill="#00e5ff" opacity="0.12" transform="rotate(5 118 51)"/>
+                            <!-- 右外趾 -->
+                            <ellipse cx="132" cy="62" rx="11" ry="13" fill="#12203a" stroke="#00e5ff" stroke-width="1.8" transform="rotate(15 132 62)"/>
+                            <ellipse cx="132" cy="61" rx="6" ry="7" fill="#00e5ff" opacity="0.12" transform="rotate(15 132 61)"/>
+                        </g>
+
+                        <!-- 趾垫连接线到掌心 -->
+                        <line x1="74" y1="72" x2="88" y2="80" stroke="#00e5ff" stroke-width="0.8" opacity="0.25"/>
+                        <line x1="85" y1="63" x2="92" y2="77" stroke="#00e5ff" stroke-width="0.8" opacity="0.25"/>
+                        <line x1="115" y1="63" x2="108" y2="77" stroke="#00e5ff" stroke-width="0.8" opacity="0.25"/>
+                        <line x1="126" y1="72" x2="112" y2="80" stroke="#00e5ff" stroke-width="0.8" opacity="0.25"/>
+
+                        <!-- 铆钉/关节点 -->
+                        <circle cx="74" cy="72" r="2.5" fill="#0a1628" stroke="#00e5ff" stroke-width="1" opacity="0.7"/>
+                        <circle cx="85" cy="63" r="2.5" fill="#0a1628" stroke="#00e5ff" stroke-width="1" opacity="0.7"/>
+                        <circle cx="115" cy="63" r="2.5" fill="#0a1628" stroke="#00e5ff" stroke-width="1" opacity="0.7"/>
+                        <circle cx="126" cy="72" r="2.5" fill="#0a1628" stroke="#00e5ff" stroke-width="1" opacity="0.7"/>
+
+                        <!-- 爪尖（从趾垫伸出的利爪） -->
+                        <path d="M60 48 L65 54 L62 55 Z" fill="#00e5ff" opacity="0.8"/>
+                        <path d="M77 38 L80 45 L77 46 Z" fill="#00e5ff" opacity="0.8"/>
+                        <path d="M123 38 L120 45 L123 46 Z" fill="#00e5ff" opacity="0.8"/>
+                        <path d="M140 48 L135 54 L138 55 Z" fill="#00e5ff" opacity="0.8"/>
+
+                        <!-- 核心之眼（掌心中央） -->
+                        <circle cx="100" cy="85" r="6" fill="#0a1628" stroke="#00e5ff" stroke-width="1.5"/>
+                        <circle cx="100" cy="85" r="3" fill="#00e5ff">
+                            <animate attributeName="r" values="3;4.5;3" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+
+                        <!-- CLAW 文字 -->
+                        <text x="100" y="160" text-anchor="middle" fill="#00e5ff" font-family="'Inter', monospace" font-size="14" font-weight="700" letter-spacing="8" opacity="0.7">CLAW</text>
+                    </svg>
+                </div>
+                <div class="logo-info">
+                    <h3>方案 A · 机械猫爪</h3>
+                    <p>具象的机械猫爪造型，四个趾垫 + 掌心 + 利爪尖。掌心嵌入 AI 核心之眼，底部连接机械手腕基座。兼具猫爪的圆润可爱与机械的硬朗质感。</p>
+                    <div class="logo-sizes">
+                        <svg width="48" height="48" viewBox="0 0 200 200">
+                            <ellipse cx="100" cy="90" rx="18" ry="14" fill="#12203a" stroke="#00e5ff" stroke-width="2.5"/>
+                            <ellipse cx="70" cy="65" rx="11" ry="13" fill="#12203a" stroke="#00e5ff" stroke-width="2.5" transform="rotate(-15 70 65)"/>
+                            <ellipse cx="85" cy="55" rx="10" ry="12" fill="#12203a" stroke="#00e5ff" stroke-width="2.5" transform="rotate(-5 85 55)"/>
+                            <ellipse cx="115" cy="55" rx="10" ry="12" fill="#12203a" stroke="#00e5ff" stroke-width="2.5" transform="rotate(5 115 55)"/>
+                            <ellipse cx="130" cy="65" rx="11" ry="13" fill="#12203a" stroke="#00e5ff" stroke-width="2.5" transform="rotate(15 130 65)"/>
+                            <circle cx="100" cy="90" r="5" fill="#00e5ff"/>
+                        </svg>
+                        <svg width="32" height="32" viewBox="0 0 200 200">
+                            <ellipse cx="100" cy="90" rx="18" ry="14" fill="#12203a" stroke="#00e5ff" stroke-width="4"/>
+                            <ellipse cx="70" cy="65" rx="11" ry="13" fill="#12203a" stroke="#00e5ff" stroke-width="4" transform="rotate(-15 70 65)"/>
+                            <ellipse cx="85" cy="55" rx="10" ry="12" fill="#12203a" stroke="#00e5ff" stroke-width="4" transform="rotate(-5 85 55)"/>
+                            <ellipse cx="115" cy="55" rx="10" ry="12" fill="#12203a" stroke="#00e5ff" stroke-width="4" transform="rotate(5 115 55)"/>
+                            <ellipse cx="130" cy="65" rx="11" ry="13" fill="#12203a" stroke="#00e5ff" stroke-width="4" transform="rotate(15 130 65)"/>
+                            <circle cx="100" cy="90" r="7" fill="#00e5ff"/>
+                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 200 200">
+                            <ellipse cx="100" cy="90" rx="20" ry="16" fill="#12203a" stroke="#00e5ff" stroke-width="8"/>
+                            <ellipse cx="70" cy="62" rx="14" ry="16" fill="#12203a" stroke="#00e5ff" stroke-width="8" transform="rotate(-15 70 62)"/>
+                            <ellipse cx="130" cy="62" rx="14" ry="16" fill="#12203a" stroke="#00e5ff" stroke-width="8" transform="rotate(15 130 62)"/>
+                            <circle cx="100" cy="90" r="12" fill="#00e5ff"/>
+                        </svg>
+                        <span class="size-label">48 / 32 / 16 px</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 方案 B：字母 C 变形爪 ===== -->
+            <div class="logo-card" id="logoB">
+                <div class="logo-preview">
+                    <svg width="180" height="180" viewBox="0 0 200 200">
+                        <defs>
+                            <filter id="glowB">
+                                <feGaussianBlur stdDeviation="4" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <linearGradient id="cGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00e5ff"/>
+                                <stop offset="100%" style="stop-color:#7c4dff"/>
+                            </linearGradient>
+                        </defs>
+
+                        <!-- 底部光晕 -->
+                        <circle cx="100" cy="100" r="75" fill="#00e5ff" opacity="0.04"/>
+
+                        <!-- 主体 C 字母（粗弧线） -->
+                        <path d="M130 50 A60 60 0 1 0 130 150" fill="none" stroke="url(#cGrad)" stroke-width="16" stroke-linecap="round" filter="url(#glowB)"/>
+
+                        <!-- C 内侧装饰弧 -->
+                        <path d="M122 62 A48 48 0 1 0 122 138" fill="none" stroke="#00e5ff" stroke-width="1" opacity="0.2" stroke-dasharray="4 6"/>
+
+                        <!-- 三道爪痕（从 C 的开口延伸） -->
+                        <g filter="url(#glowB)">
+                            <!-- 爪痕 1（上） -->
+                            <path d="M128 48 L168 28 L172 34 L134 52" fill="url(#cGrad)" opacity="0.95"/>
+                            <line x1="168" y1="28" x2="178" y2="22" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+
+                            <!-- 爪痕 2（中） -->
+                            <path d="M142 96 L182 90 L183 97 L143 103" fill="url(#cGrad)" opacity="0.95"/>
+                            <line x1="182" y1="90" x2="192" y2="88" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+
+                            <!-- 爪痕 3（下） -->
+                            <path d="M128 148 L168 168 L172 162 L134 144" fill="url(#cGrad)" opacity="0.95"/>
+                            <line x1="168" y1="168" x2="178" y2="174" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+                        </g>
+
+                        <!-- 爪痕拉丝/速度线 -->
+                        <line x1="140" y1="35" x2="160" y2="28" stroke="#00e5ff" stroke-width="0.8" opacity="0.2"/>
+                        <line x1="148" y1="93" x2="172" y2="90" stroke="#00e5ff" stroke-width="0.8" opacity="0.2"/>
+                        <line x1="140" y1="162" x2="160" y2="168" stroke="#00e5ff" stroke-width="0.8" opacity="0.2"/>
+
+                        <!-- C 内核心点 -->
+                        <circle cx="85" cy="100" r="8" fill="#0a1628" stroke="#00e5ff" stroke-width="1.5"/>
+                        <circle cx="85" cy="100" r="3.5" fill="#00e5ff">
+                            <animate attributeName="r" values="3.5;5;3.5" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+
+                        <!-- 文字 -->
+                        <text x="100" y="192" text-anchor="middle" fill="#00e5ff" font-family="'Inter', monospace" font-size="12" font-weight="700" letter-spacing="8" opacity="0.5">CLAW</text>
+                    </svg>
+                </div>
+                <div class="logo-info">
+                    <h3>方案 B · 字母爪痕</h3>
+                    <p>字母 "C" 作为主体，右侧开口延伸出三道锋利的爪痕划痕。简洁且辨识度极高，任何尺寸下都能一眼认出。C = CLAW，爪痕 = 力量。</p>
+                    <div class="logo-sizes">
+                        <svg width="48" height="48" viewBox="0 0 200 200">
+                            <path d="M125 50 A55 55 0 1 0 125 150" fill="none" stroke="#00e5ff" stroke-width="18" stroke-linecap="round"/>
+                            <path d="M124 46 L165 28" stroke="#00e5ff" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M138 96 L178 92" stroke="#00e5ff" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M124 150 L165 168" stroke="#00e5ff" stroke-width="5" stroke-linecap="round"/>
+                            <circle cx="85" cy="100" r="6" fill="#00e5ff"/>
+                        </svg>
+                        <svg width="32" height="32" viewBox="0 0 200 200">
+                            <path d="M125 50 A55 55 0 1 0 125 150" fill="none" stroke="#00e5ff" stroke-width="22" stroke-linecap="round"/>
+                            <path d="M124 46 L162 30" stroke="#00e5ff" stroke-width="7" stroke-linecap="round"/>
+                            <path d="M138 96 L175 92" stroke="#00e5ff" stroke-width="7" stroke-linecap="round"/>
+                            <path d="M124 150 L162 166" stroke="#00e5ff" stroke-width="7" stroke-linecap="round"/>
+                            <circle cx="85" cy="100" r="8" fill="#00e5ff"/>
+                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 200 200">
+                            <path d="M125 50 A55 55 0 1 0 125 150" fill="none" stroke="#00e5ff" stroke-width="30" stroke-linecap="round"/>
+                            <path d="M124 46 L158 32" stroke="#00e5ff" stroke-width="12" stroke-linecap="round"/>
+                            <path d="M138 96 L170 92" stroke="#00e5ff" stroke-width="12" stroke-linecap="round"/>
+                            <path d="M124 150 L158 164" stroke="#00e5ff" stroke-width="12" stroke-linecap="round"/>
+                        </svg>
+                        <span class="size-label">48 / 32 / 16 px</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 方案 C：爪痕符号 ===== -->
+            <div class="logo-card" id="logoC">
+                <div class="logo-preview">
+                    <svg width="180" height="180" viewBox="0 0 200 200">
+                        <defs>
+                            <filter id="glowC">
+                                <feGaussianBlur stdDeviation="4" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                            <linearGradient id="slashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#00e5ff"/>
+                                <stop offset="60%" style="stop-color:#7c4dff"/>
+                                <stop offset="100%" style="stop-color:#e040fb"/>
+                            </linearGradient>
+                        </defs>
+
+                        <!-- 背景圆（可选） -->
+                        <circle cx="100" cy="100" r="80" fill="#0a1628" stroke="#00e5ff" stroke-width="1" opacity="0.3"/>
+
+                        <!-- 底部弧光 -->
+                        <ellipse cx="100" cy="165" rx="50" ry="6" fill="#00e5ff" opacity="0.08"/>
+
+                        <!-- 三道平行爪痕 — 斜线，从左上到右下 -->
+                        <g filter="url(#glowC)">
+                            <!-- 左爪痕 -->
+                            <path d="M48 35 Q55 75 52 105 Q49 135 55 165" stroke="url(#slashGrad)" stroke-width="14" stroke-linecap="round" fill="none"/>
+                            <!-- 中爪痕 -->
+                            <path d="M88 30 Q96 70 94 100 Q92 130 98 162" stroke="url(#slashGrad)" stroke-width="16" stroke-linecap="round" fill="none"/>
+                            <!-- 右爪痕 -->
+                            <path d="M130 35 Q138 75 136 105 Q134 135 140 165" stroke="url(#slashGrad)" stroke-width="14" stroke-linecap="round" fill="none"/>
+                        </g>
+
+                        <!-- 爪痕顶部尖锐入口 -->
+                        <circle cx="48" cy="35" r="3" fill="#00e5ff" opacity="0.8"/>
+                        <circle cx="88" cy="30" r="3.5" fill="#00e5ff" opacity="0.8"/>
+                        <circle cx="130" cy="35" r="3" fill="#00e5ff" opacity="0.8"/>
+
+                        <!-- 划痕碎片/火花 -->
+                        <circle cx="60" cy="55" r="1.5" fill="#00e5ff" opacity="0.4">
+                            <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="105" cy="65" r="1.5" fill="#7c4dff" opacity="0.4">
+                            <animate attributeName="opacity" values="0;0.5;0" dur="2.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="142" cy="52" r="1.5" fill="#e040fb" opacity="0.4">
+                            <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="50" cy="130" r="1" fill="#00e5ff" opacity="0.3">
+                            <animate attributeName="opacity" values="0;0.4;0" dur="2.8s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="135" cy="140" r="1" fill="#7c4dff" opacity="0.3">
+                            <animate attributeName="opacity" values="0.3;0;0.3" dur="3.2s" repeatCount="indefinite"/>
+                        </circle>
+
+                        <!-- 故障扫描线效果 -->
+                        <rect x="30" y="90" width="140" height="1" fill="#00e5ff" opacity="0.1">
+                            <animate attributeName="y" values="30;170;30" dur="4s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0;0.15;0" dur="4s" repeatCount="indefinite"/>
+                        </rect>
+
+                        <!-- 文字 -->
+                        <text x="100" y="192" text-anchor="middle" fill="#00e5ff" font-family="'Inter', monospace" font-size="12" font-weight="700" letter-spacing="8" opacity="0.5">CLAW</text>
+                    </svg>
+                </div>
+                <div class="logo-info">
+                    <h3>方案 C · 爪痕划痕</h3>
+                    <p>三道平行的竖向爪痕，极简但攻击性十足。搭配故障扫描线和粒子火花效果，纯粹的赛博朋克力量感。一看就是 "CLAW"，无需解释。</p>
+                    <div class="logo-sizes">
+                        <svg width="48" height="48" viewBox="0 0 200 200">
+                            <path d="M55 35 Q60 100 58 165" stroke="#00e5ff" stroke-width="16" stroke-linecap="round" fill="none"/>
+                            <path d="M98 30 Q103 100 100 165" stroke="#00e5ff" stroke-width="18" stroke-linecap="round" fill="none"/>
+                            <path d="M140 35 Q145 100 142 165" stroke="#00e5ff" stroke-width="16" stroke-linecap="round" fill="none"/>
+                        </svg>
+                        <svg width="32" height="32" viewBox="0 0 200 200">
+                            <path d="M55 35 Q60 100 58 165" stroke="#00e5ff" stroke-width="22" stroke-linecap="round" fill="none"/>
+                            <path d="M98 30 Q103 100 100 165" stroke="#00e5ff" stroke-width="24" stroke-linecap="round" fill="none"/>
+                            <path d="M140 35 Q145 100 142 165" stroke="#00e5ff" stroke-width="22" stroke-linecap="round" fill="none"/>
+                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 200 200">
+                            <path d="M55 30 Q60 100 58 170" stroke="#00e5ff" stroke-width="32" stroke-linecap="round" fill="none"/>
+                            <path d="M100 25 Q105 100 102 175" stroke="#00e5ff" stroke-width="34" stroke-linecap="round" fill="none"/>
+                            <path d="M145 30 Q150 100 147 170" stroke="#00e5ff" stroke-width="32" stroke-linecap="round" fill="none"/>
+                        </svg>
+                        <span class="size-label">48 / 32 / 16 px</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ========== WORK LOG ========== -->
+    <section id="worklog" class="section">
+        <div class="section-header">
+            <h2>最近在忙什么</h2>
+            <div class="filter-tags" id="worklogFilters">
+                <button class="tag-filter active" data-filter="all">全部</button>
+            </div>
+        </div>
+        <div class="timeline" id="timelineContainer">
+            <!-- JS 动态填充 -->
+        </div>
+    </section>
+
+    <!-- ========== MOMENTS ========== -->
+    <section id="moments" class="section">
+        <div class="section-header">
+            <h2>CLAW 动态</h2>
+        </div>
+        <div class="moments-grid" id="momentsContainer">
+            <!-- JS 动态填充 -->
+        </div>
+    </section>
+
+    <!-- ========== CHAT ========== -->
+    <section id="chat" class="section">
+        <div class="section-header">
+            <h2>和我聊聊</h2>
+        </div>
+        <div class="chat-wrapper">
+            <div class="chat-box">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-msg bot">
+                        <div class="chat-avatar">
+                            <svg width="32" height="32" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="40" fill="#0a1628" stroke="#00e5ff" stroke-width="2"/>
+                                <path d="M50 20 L44 38 L50 34 L56 38 Z" fill="#00e5ff" opacity="0.9"/>
+                                <path d="M24 68 L38 58 L36 52 L28 60 Z" fill="#00e5ff" opacity="0.9"/>
+                                <path d="M76 68 L62 58 L64 52 L72 60 Z" fill="#00e5ff" opacity="0.9"/>
+                                <circle cx="50" cy="50" r="10" fill="#0a1628" stroke="#00e5ff" stroke-width="1.5"/>
+                                <circle cx="50" cy="50" r="4" fill="#00e5ff"/>
+                            </svg>
+                        </div>
+                        <div class="chat-bubble bot">系统就绪。我是 CLAW，你的 AI 私人助手。有什么需要？</div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="说点什么..." autocomplete="off">
+                    <button class="btn btn-primary chat-send" id="chatSend">发送</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="footer">
+        <p>Powered by <strong>OpenClaw</strong> &middot; 私有部署于 Mac Mini &middot; CLAW v1.0</p>
+    </footer>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
