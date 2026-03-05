@@ -1,48 +1,66 @@
 import math
-import random
 from PyQt6.QtWidgets import QWidget, QMenu
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, pyqtProperty
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QPoint
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QAction,
+    QLinearGradient, QPolygonF,
 )
 
-# Canvas size — 小巧版
-TV_W, TV_H = 100, 120
+# ---------------------------------------------------------------------------
+# 画布 & 坐标
+# ---------------------------------------------------------------------------
+# Web SVG viewBox = 0 0 220 220，桌面缩放到 120x120
+TV_W, TV_H = 120, 120
+S = TV_W / 220.0  # ≈0.545 缩放因子
 
-# B站经典蓝
-BILI = QColor(0, 161, 214)       # #00A1D6
-BILI_DARK = QColor(0, 130, 180)
-WHITE = QColor(255, 255, 255)
+# SVG 中心 110,110 → 桌面中心
+CX = 110 * S  # 60
+CY = 110 * S  # 60
 
-# 机身区域（粗圆角矩形）
-BODY = QRectF(10, 30, 80, 62)
-BODY_R = 12  # 圆角半径
+# ---------------------------------------------------------------------------
+# 颜色（与网页端 CSS 变量一致）
+# ---------------------------------------------------------------------------
+CYAN = QColor(0, 229, 255)          # #00e5ff
+PURPLE = QColor(124, 77, 255)       # #7c4dff
+DARK_BG = QColor(10, 22, 40)        # #0a1628
+PINK = QColor(255, 64, 129)         # chat 模式
+ORANGE = QColor(255, 171, 64)       # reminder 模式
+
+
+def _sv(x, y=None):
+    """将 SVG 坐标 (220 空间) 映射到桌面像素。"""
+    if y is None:
+        return x * S
+    return QPointF(x * S, y * S)
 
 
 class TVWidget(QWidget):
-    """B站经典小电视桌面宠物。"""
+    """赛博朋克 CLAW 桌面宠物 — 与网页端 Logo 完全一致。"""
 
     def __init__(self, event_bus, parent=None):
         super().__init__(parent)
         self._event_bus = event_bus
         self._mode = "idle"
         self._screen_text = ""
-        self._antenna_angle = 0.0
         self._frame = 0
-        self._face_state = "normal"  # normal/blink/surprise/love/smirk/dizzy/sleep
         self._drag_pos = None
         self._bounce_y = 0.0
 
+        # 动画
+        self._ring_angle = 0.0
+        self._eye_pulse = 0.0  # 0~1
+
         self._chat_panel = None
         self._news_panel = None
-        self._bubble = None  # BubbleToast, set externally
-        self._dragged = False  # 区分单击和拖拽
+        self._bubble = None
+        self._dragged = False
         self._chat_open = False
 
         self._setup_window()
         self._setup_timers()
         self._connect_events()
 
+    # ------------------------------------------------------------------ setup
     def _setup_window(self):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -57,28 +75,13 @@ class TVWidget(QWidget):
         self.move(x, y)
 
     def _setup_timers(self):
-        self._antenna_angle = 0.0
-
-        self._blink_timer = QTimer(self)
-        self._blink_timer.timeout.connect(self._update_blink)
-        self._blink_timer.start(10000)
-
         self._frame_timer = QTimer(self)
         self._frame_timer.timeout.connect(self._tick)
-        self._frame_timer.start(40)
+        self._frame_timer.start(40)  # ~25 fps
 
     def _connect_events(self):
         self._event_bus.mode_changed.connect(self.set_mode)
         self._event_bus.water_reminder_triggered.connect(self._on_water_reminder)
-
-    def get_antenna_angle(self):
-        return self._antenna_angle
-
-    def set_antenna_angle(self, v):
-        self._antenna_angle = v
-        self.update()
-
-    antenna_angle = pyqtProperty(float, get_antenna_angle, set_antenna_angle)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -94,27 +97,11 @@ class TVWidget(QWidget):
         self._screen_text = text
         self.update()
 
-    def _update_antenna(self):
-        self._antenna_angle = 5 * math.sin(self._frame * 0.12)
-        self.update()
-
-    def _update_blink(self):
-        if self._chat_open:
-            return
-        self._face_state = random.choice([
-            "normal", "normal", "normal", "normal",
-            "blink", "surprise", "love", "smirk", "dizzy", "sleep",
-        ])
-        QTimer.singleShot(3000, self._reset_face)
-        self.update()
-
-    def _reset_face(self):
-        self._face_state = "normal"
-        self.update()
-
     def _tick(self):
         self._frame += 1
-        self._bounce_y = 1.2 * math.sin(self._frame * 0.06)
+        self._bounce_y = 3.0 * math.sin(self._frame * 0.045)
+        self._ring_angle = (self._frame * 1.5) % 360
+        self._eye_pulse = 0.5 + 0.5 * math.sin(self._frame * 0.08)
         self.update()
 
     def _on_water_reminder(self):
@@ -124,216 +111,232 @@ class TVWidget(QWidget):
         self.show_bubble(msg)
 
     def show_bubble(self, text, duration=5000):
-        """在小电视头顶弹出气泡消息。"""
         if self._bubble:
             self._bubble.show_message(text, self, duration)
 
-    # ==================== PAINTING ====================
+    # ================================================================ 渐变工具
+    def _claw_gradient(self, x1, y1, x2, y2):
+        """复现 SVG linearGradient #clawGrad: cyan → purple 对角线。"""
+        g = QLinearGradient(_sv(x1, y1), _sv(x2, y2))
+        g.setColorAt(0.0, CYAN)
+        g.setColorAt(1.0, PURPLE)
+        return g
+
+    def _ring_gradient(self, x1, y1, x2, y2):
+        """复现 SVG linearGradient #ringGrad。"""
+        g = QLinearGradient(_sv(x1, y1), _sv(x2, y2))
+        c0 = QColor(CYAN); c0.setAlpha(204)   # 0.8
+        c1 = QColor(PURPLE); c1.setAlpha(102)  # 0.4
+        c2 = QColor(CYAN); c2.setAlpha(204)
+        g.setColorAt(0.0, c0)
+        g.setColorAt(0.5, c1)
+        g.setColorAt(1.0, c2)
+        return g
+
+    # ================================================================ PAINTING
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.translate(0, self._bounce_y)
 
-        self._draw_body(p)
-        self._draw_antennas(p)
+        self._draw_outer_dash_ring(p)   # 最外旋转虚线环
+        self._draw_main_ring(p)         # 外圆主环
+        self._draw_inner_dash_ring(p)   # 内圆虚线环（反向）
+        # 六边形及内部整体放大 1.15x（以中心为原点）
+        p.save()
+        p.translate(CX, CY)
+        p.scale(1.05, 1.05)
+        p.translate(-CX, -CY)
+        p.translate(0, _sv(10))         # 整体下移，仍保持中上方
+        self._draw_hexagon(p)           # 六边形底座
+        self._draw_circuit_lines(p)     # 电路装饰线
+        self._draw_claws(p)             # 三指机械爪
+        self._draw_joints(p)            # 关节点 + 连接线
+        self._draw_eye(p)               # AI 之眼
+        p.restore()
+        self._draw_label(p)             # CLAW 文字
+        self._draw_ticks(p)             # 刻度标记
 
-        if self._mode == "idle":
-            self._draw_face(p)
-        else:
-            self._draw_text_screen(p)
-
-        self._draw_legs(p)
         p.end()
 
-    # ---------- 天线 ----------
-    def _draw_antennas(self, p: QPainter):
-        cx = BODY.center().x()
-        base_y = BODY.top() - 2  # 起点在机身边框上方，避免重叠阴影
-        pen = QPen(BILI, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+    # ---- 最外旋转虚线环  SVG: r=106 dasharray="6 10" opacity=0.3 ----
+    def _draw_outer_dash_ring(self, p: QPainter):
+        r = _sv(106)
+        p.save()
+        p.translate(CX, CY)
+        p.rotate(self._ring_angle)
+        pen = QPen(QBrush(self._ring_gradient(0, 0, 220, 220)), _sv(1))
+        pen.setDashPattern([6, 10])
         p.setPen(pen)
-
-        p.save()
-        p.translate(cx - 5, base_y)
-        p.rotate(self._antenna_angle)
-        p.drawLine(QPointF(0, 0), QPointF(-14, -24))
+        p.setOpacity(0.3)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QPointF(0, 0), r, r)
         p.restore()
 
+    # ---- 外圆主环  SVG: r=96 stroke=clawGrad width=2 ----
+    def _draw_main_ring(self, p: QPainter):
+        r = _sv(96)
+        pen = QPen(QBrush(self._claw_gradient(0, 0, 220, 220)), _sv(2))
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QPointF(CX, CY), r, r)
+
+    # ---- 内圆虚线环  SVG: r=89 dasharray="4 8" opacity=0.25 反向 ----
+    def _draw_inner_dash_ring(self, p: QPainter):
+        r = _sv(89)
         p.save()
-        p.translate(cx + 5, base_y)
-        p.rotate(-self._antenna_angle)
-        p.drawLine(QPointF(0, 0), QPointF(14, -24))
+        p.translate(CX, CY)
+        p.rotate(-self._ring_angle * 0.72)  # 反向、稍慢 (25/18≈1.39, 1/1.39≈0.72)
+        pen = QPen(QBrush(self._ring_gradient(0, 0, 220, 220)), _sv(0.8))
+        pen.setDashPattern([4, 8])
+        p.setPen(pen)
+        p.setOpacity(0.25)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QPointF(0, 0), r, r)
         p.restore()
 
-    # ---------- 机身 ----------
-    def _draw_body(self, p: QPainter):
-        """白色填充 + 蓝色粗圆角边框。"""
-        p.setBrush(WHITE)
-        p.setPen(QPen(BILI, 5))
-        p.drawRoundedRect(BODY, BODY_R, BODY_R)
+    # ---- 六边形底座  SVG: points="110,20 164,51 164,113 110,144 56,113 56,51" ----
+    def _draw_hexagon(self, p: QPainter):
+        pts = QPolygonF([
+            _sv(110, 20), _sv(164, 51), _sv(164, 113),
+            _sv(110, 144), _sv(56, 113), _sv(56, 51),
+        ])
+        p.setBrush(DARK_BG)
+        p.setPen(QPen(QBrush(self._claw_gradient(0, 0, 220, 220)), _sv(1.5)))
+        p.drawPolygon(pts)
 
-    # ---------- 表情（idle 状态） ----------
-    def _draw_face(self, p: QPainter):
-        cx = BODY.center().x()
-        cy = BODY.center().y()
-        eye_y = cy - 5
-        eye_lx = cx - 14
-        eye_rx = cx + 14
-        mouth_y = cy + 9
-        st = self._face_state
-        pen2 = QPen(BILI, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+    # ---- 电路装饰线  SVG 四条线 opacity=0.2 ----
+    def _draw_circuit_lines(self, p: QPainter):
+        pen = QPen(CYAN, _sv(0.7))
+        p.setPen(pen)
+        p.setOpacity(0.2)
+        p.drawLine(_sv(76, 53), _sv(76, 82))
+        p.drawLine(_sv(144, 53), _sv(144, 82))
+        p.drawLine(_sv(76, 82), _sv(92, 82))
+        p.drawLine(_sv(144, 82), _sv(128, 82))
+        p.setOpacity(1.0)
 
-        # ===== 眼睛 =====
-        if st == "blink":
-            # 眯眯眼 —— 两条弧线
-            p.setPen(pen2); p.setBrush(Qt.BrushStyle.NoBrush)
-            for ex in (eye_lx, eye_rx):
-                path = QPainterPath()
-                path.moveTo(ex - 5, eye_y - 1)
-                path.quadTo(QPointF(ex, eye_y + 4), QPointF(ex + 5, eye_y - 1))
-                p.drawPath(path)
-
-        elif st == "surprise":
-            # 惊讶 —— 大圆眼 + 高光
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(BILI)
-            for ex in (eye_lx, eye_rx):
-                p.drawEllipse(QPointF(ex, eye_y), 6, 6)
-                p.setBrush(WHITE)
-                p.drawEllipse(QPointF(ex + 2, eye_y - 2), 2, 2)
-                p.setBrush(BILI)
-
-        elif st == "love":
-            # 爱心眼
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(BILI)
-            for ex in (eye_lx, eye_rx):
-                self._draw_heart(p, ex, eye_y, 11)
-
-        elif st == "smirk":
-            # 坏笑 —— 左眼正常，右眼眯起
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(BILI)
-            # 左眼：正常横条
-            p.save()
-            p.translate(eye_lx, eye_y); p.rotate(-8)
-            p.drawRoundedRect(QRectF(-6, -2.5, 12, 5), 1.5, 1.5)
-            p.restore()
-            # 右眼：向上弯的弧线（挑眉）
-            p.setPen(pen2); p.setBrush(Qt.BrushStyle.NoBrush)
-            path = QPainterPath()
-            path.moveTo(eye_rx - 6, eye_y + 1)
-            path.quadTo(QPointF(eye_rx, eye_y - 4), QPointF(eye_rx + 6, eye_y + 1))
-            p.drawPath(path)
-
-        elif st == "dizzy":
-            # 晕 —— 两个螺旋圈
-            p.setPen(QPen(BILI, 1.5)); p.setBrush(Qt.BrushStyle.NoBrush)
-            for ex in (eye_lx, eye_rx):
-                p.drawEllipse(QPointF(ex, eye_y), 5, 5)
-                p.drawEllipse(QPointF(ex, eye_y), 2, 2)
-
-        elif st == "sleep":
-            # 睡觉 —— 两条平线 + Zzz
-            p.setPen(pen2); p.setBrush(Qt.BrushStyle.NoBrush)
-            for ex in (eye_lx, eye_rx):
-                p.drawLine(QPointF(ex - 5, eye_y), QPointF(ex + 5, eye_y))
-            # Zzz
-            p.setFont(QFont("Arial", 7, QFont.Weight.Bold))
-            p.setPen(BILI)
-            zx = eye_rx + 10
-            p.drawText(QPointF(zx, eye_y - 6), "z")
-            p.drawText(QPointF(zx + 4, eye_y - 12), "Z")
-
-        else:
-            # 默认 normal —— 倾斜横条眼 + 瞳孔微移
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(BILI)
-            dx = 1.5 * math.sin(self._frame * 0.04)
-            p.save()
-            p.translate(eye_lx + dx, eye_y); p.rotate(-8)
-            p.drawRoundedRect(QRectF(-6, -2.5, 12, 5), 1.5, 1.5)
-            p.restore()
-            p.save()
-            p.translate(eye_rx + dx, eye_y); p.rotate(8)
-            p.drawRoundedRect(QRectF(-6, -2.5, 12, 5), 1.5, 1.5)
-            p.restore()
-
-        # ===== 嘴巴 =====
-        p.setPen(pen2); p.setBrush(Qt.BrushStyle.NoBrush)
-
-        if st == "surprise":
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(BILI)
-            p.drawEllipse(QPointF(cx, mouth_y + 1), 3, 3)
-        elif st == "love":
-            # 开心大笑弧
-            path = QPainterPath()
-            path.moveTo(cx - 10, mouth_y - 1)
-            path.quadTo(QPointF(cx, mouth_y + 8), QPointF(cx + 10, mouth_y - 1))
-            p.drawPath(path)
-        elif st == "smirk":
-            # 歪嘴笑
-            path = QPainterPath()
-            path.moveTo(cx - 8, mouth_y)
-            path.quadTo(QPointF(cx + 2, mouth_y + 6), QPointF(cx + 10, mouth_y - 2))
-            p.drawPath(path)
-        elif st == "dizzy":
-            # 波浪嘴
-            path = QPainterPath()
-            path.moveTo(cx - 8, mouth_y)
-            path.cubicTo(QPointF(cx - 4, mouth_y + 4), QPointF(cx + 4, mouth_y - 4), QPointF(cx + 8, mouth_y))
-            p.drawPath(path)
-        elif st == "sleep":
-            # 微张小嘴
-            p.setPen(Qt.PenStyle.NoPen); p.setBrush(BILI)
-            p.drawEllipse(QPointF(cx, mouth_y + 1), 3, 2)
-        else:
-            # 默认 ω 猫嘴
-            path = QPainterPath()
-            w = 6
-            path.moveTo(cx - w * 2, mouth_y)
-            path.quadTo(QPointF(cx - w, mouth_y + 6), QPointF(cx, mouth_y))
-            path.quadTo(QPointF(cx + w, mouth_y + 6), QPointF(cx + w * 2, mouth_y))
-            p.drawPath(path)
-
-    def _draw_heart(self, p: QPainter, cx, cy, size):
-        """画一个小爱心。"""
-        s = size / 2
-        path = QPainterPath()
-        path.moveTo(cx, cy + s * 0.5)
-        path.cubicTo(QPointF(cx - s, cy - s * 0.3), QPointF(cx - s * 0.5, cy - s), QPointF(cx, cy - s * 0.3))
-        path.cubicTo(QPointF(cx + s * 0.5, cy - s), QPointF(cx + s, cy - s * 0.3), QPointF(cx, cy + s * 0.5))
-        p.drawPath(path)
-
-    # ---------- 文字屏幕（非 idle 状态） ----------
-    def _draw_text_screen(self, p: QPainter):
-        inner = BODY.adjusted(6, 6, -6, -6)
-
-        if self._mode == "reminder":
-            p.setFont(QFont("PingFang SC", 8, QFont.Weight.Bold))
-            p.setPen(BILI)
-            p.drawText(inner, Qt.AlignmentFlag.AlignCenter, self._screen_text)
-        elif self._mode in ("chat", "news"):
-            p.setFont(QFont("PingFang SC", 6))
-            p.setPen(BILI_DARK)
-            text = self._screen_text or ("聊天中..." if self._mode == "chat" else "新闻...")
-            p.drawText(inner, Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, text[:30])
-
-    # ---------- 两只小短腿 ----------
-    def _draw_legs(self, p: QPainter):
+    # ---- 三指机械爪  SVG: 三个 path 填充 clawGrad opacity=0.95 ----
+    def _draw_claws(self, p: QPainter):
+        grad = self._claw_gradient(0, 0, 220, 220)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(BILI)
+        p.setBrush(QBrush(grad))
+        p.setOpacity(0.95)
 
-        foot_w = 14
-        foot_h = 8
-        foot_r = 4
-        bottom = BODY.bottom()
+        # 上爪  M110 30 L101 57 L110 50 L119 57 Z
+        top = QPainterPath()
+        top.moveTo(_sv(110, 30))
+        top.lineTo(_sv(101, 57))
+        top.lineTo(_sv(110, 50))
+        top.lineTo(_sv(119, 57))
+        top.closeSubpath()
+        p.drawPath(top)
 
-        t = self._frame * 0.1
-        off_l = math.sin(t) * 1.2
-        off_r = math.sin(t + math.pi) * 1.2
+        # 左下爪  M56 120 L78 102 L74 94 L59 109 Z
+        left = QPainterPath()
+        left.moveTo(_sv(56, 120))
+        left.lineTo(_sv(78, 102))
+        left.lineTo(_sv(74, 94))
+        left.lineTo(_sv(59, 109))
+        left.closeSubpath()
+        p.drawPath(left)
 
-        lx = BODY.left() + 12
-        rx = BODY.right() - 12 - foot_w
-        p.drawRoundedRect(QRectF(lx, bottom - 1 + off_l, foot_w, foot_h), foot_r, foot_r)
-        p.drawRoundedRect(QRectF(rx, bottom - 1 + off_r, foot_w, foot_h), foot_r, foot_r)
+        # 右下爪  M164 120 L142 102 L146 94 L161 109 Z
+        right = QPainterPath()
+        right.moveTo(_sv(164, 120))
+        right.lineTo(_sv(142, 102))
+        right.lineTo(_sv(146, 94))
+        right.lineTo(_sv(161, 109))
+        right.closeSubpath()
+        p.drawPath(right)
 
-    # ==================== MOUSE EVENTS ====================
+        p.setOpacity(1.0)
+
+    # ---- 关节点 + 连接线 ----
+    def _draw_joints(self, p: QPainter):
+        joints = [(110, 57), (76, 99), (144, 99)]
+        # 连接线到中心眼区域  opacity=0.4
+        targets = [(110, 72), (91, 91), (129, 91)]
+        line_pen = QPen(CYAN, _sv(1.2))
+        p.setOpacity(0.4)
+        p.setPen(line_pen)
+        for (jx, jy), (tx, ty) in zip(joints, targets):
+            p.drawLine(_sv(jx, jy), _sv(tx, ty))
+        p.setOpacity(1.0)
+
+        # 关节圆点  r=2.5 opacity=0.7
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(CYAN)
+        p.setOpacity(0.7)
+        for jx, jy in joints:
+            p.drawEllipse(_sv(jx, jy), _sv(2.5), _sv(2.5))
+        p.setOpacity(1.0)
+
+    # ---- AI 之眼 ----
+    def _draw_eye(self, p: QPainter):
+        # SVG 眼中心 (110, 88)
+        ex, ey = 110, 88
+
+        # 模式颜色
+        if self._mode == "chat":
+            accent = PINK
+        elif self._mode == "reminder":
+            accent = ORANGE
+        else:
+            accent = CYAN
+
+        pulse = self._eye_pulse  # 0~1
+
+        # 外环  r=20 stroke=clawGrad width=1.8  fill=DARK
+        p.setBrush(DARK_BG)
+        p.setPen(QPen(QBrush(self._claw_gradient(0, 0, 220, 220)), _sv(1.8)))
+        p.drawEllipse(_sv(ex, ey), _sv(20), _sv(20))
+
+        # 脉冲环  r: 12→16  opacity: 0.4→0.1
+        pulse_r = _sv(12 + 4 * pulse)
+        pulse_opacity = 0.4 - 0.3 * pulse
+        p.setPen(QPen(accent, _sv(0.8)))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setOpacity(max(pulse_opacity, 0.05))
+        p.drawEllipse(_sv(ex, ey), pulse_r, pulse_r)
+        p.setOpacity(1.0)
+
+        # 核心亮球  r: 7→9  opacity: 1→0.5
+        core_r = _sv(7 + 2 * pulse)
+        core_opacity = 1.0 - 0.5 * pulse
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(accent)
+        p.setOpacity(core_opacity)
+        p.drawEllipse(_sv(ex, ey), core_r, core_r)
+        p.setOpacity(1.0)
+
+    # ---- CLAW 文字  SVG: x=110 y=172 font-size=13 letter-spacing=6 opacity=0.7 ----
+    def _draw_label(self, p: QPainter):
+        p.setOpacity(0.7)
+        font = QFont("Menlo", max(int(13 * S), 6), QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 6 * S)
+        p.setFont(font)
+        p.setPen(CYAN)
+        text_rect = QRectF(0, _sv(162), TV_W, _sv(20))
+        p.drawText(text_rect, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, "CLAW")
+        p.setOpacity(1.0)
+
+    # ---- 刻度标记  SVG: 4 条线 opacity=0.25 ----
+    def _draw_ticks(self, p: QPainter):
+        p.setOpacity(0.25)
+        pen = QPen(CYAN, _sv(1))
+        p.setPen(pen)
+        # 上: (110,14)→(110,20)
+        p.drawLine(_sv(110, 14), _sv(110, 20))
+        # 下: (110,200)→(110,206)
+        p.drawLine(_sv(110, 200), _sv(110, 206))
+        # 左: (14,110)→(20,110)
+        p.drawLine(_sv(14, 110), _sv(20, 110))
+        # 右: (200,110)→(206,110)
+        p.drawLine(_sv(200, 110), _sv(206, 110))
+        p.setOpacity(1.0)
+
+    # ================================================================ MOUSE
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
@@ -349,7 +352,6 @@ class TVWidget(QWidget):
             if abs(delta.x()) > 2 or abs(delta.y()) > 2:
                 self._dragged = True
             self.move(new_pos)
-            # 面板和气泡跟随移动
             for panel in (self._chat_panel, self._news_panel, self._bubble):
                 if panel and panel.isVisible():
                     panel.move(panel.pos() + delta)
@@ -360,11 +362,10 @@ class TVWidget(QWidget):
         self._drag_pos = None
 
     def mouseDoubleClickEvent(self, event):
-        self._dragged = True  # 防止双击同时触发单击气泡
+        self._dragged = True
         self._toggle_chat()
 
     def _on_click(self):
-        """单击 CLAW，弹出随机互动消息。"""
         import random
         msgs = [
             "系统就绪，等待指令。",
@@ -389,13 +390,14 @@ class TVWidget(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
-                background: #fff; color: #333; border: 1px solid #e0e0e0;
+                background: #0a1628; color: #00e5ff;
+                border: 1px solid #00e5ff;
                 border-radius: 8px; padding: 6px;
-                font-family: "PingFang SC";
+                font-family: "Menlo";
             }
             QMenu::item { padding: 6px 20px; border-radius: 4px; }
-            QMenu::item:selected { background: #00A1D6; color: white; }
-            QMenu::separator { height: 1px; background: #eee; margin: 4px 8px; }
+            QMenu::item:selected { background: #7c4dff; color: white; }
+            QMenu::separator { height: 1px; background: #1a3050; margin: 4px 8px; }
         """)
 
         chat_action = QAction("聊天", self)
@@ -425,19 +427,11 @@ class TVWidget(QWidget):
             if self._chat_panel.isVisible():
                 self._chat_panel.hide()
                 self._chat_open = False
-                self._face_state = "normal"
                 self.update()
             else:
-                self._face_state = "surprise"
                 self._chat_open = True
                 self.update()
-                QTimer.singleShot(800, self._enter_chat_face)
                 self._chat_panel.show_near(self)
-
-    def _enter_chat_face(self):
-        if self._chat_open:
-            self._face_state = "smirk"
-            self.update()
 
     def _toggle_news(self):
         if self._news_panel:
