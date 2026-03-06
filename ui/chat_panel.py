@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QLabel, QScrollArea, QFrame,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QTimer, QMargins
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QPainter, QPainterPath
 
-from features.ai_chat import create_provider, ChatWorker
 from core.config_manager import config
-
-SYSTEM_PROMPT = "你是 CLAW（Cognitive Learning & Automated Wisdom），一个赛博风格的 AI 私人助手。你性格沉稳、高效、偶尔带点幽默。回答简洁精准。用中文交流。"
+from core.api_client import OpenClawClient
 
 BUBBLE_MAX_WIDTH = 260
 BUBBLE_PADDING = 24  # left 12 + right 12
@@ -26,7 +26,6 @@ class ChatBubble(QLabel):
         self.setFont(QFont("PingFang SC", 11))
         self.setContentsMargins(12, 8, 12, 8)
 
-        # 短文字按实际宽度，长文字撑满最大宽度
         fm = self.fontMetrics()
         text_width = fm.horizontalAdvance(text) + BUBBLE_PADDING
         self.setFixedWidth(min(text_width, BUBBLE_MAX_WIDTH))
@@ -57,11 +56,39 @@ class ChatBubble(QLabel):
         super().paintEvent(event)
 
 
+class ServerChatWorker(QThread):
+    """Streams chat response from OpenClaw server in a background thread."""
+    chunk_received = pyqtSignal(str)   # accumulated text so far
+    finished = pyqtSignal(str)          # full reply
+    error = pyqtSignal(str)
+
+    def __init__(self, client: OpenClawClient, message: str, session_id: str | None):
+        super().__init__()
+        self._client = client
+        self._message = message
+        self._session_id = session_id
+        self.result_session_id = session_id or ""
+
+    def run(self):
+        try:
+            result, stream = self._client.chat_stream(
+                self._message, self._session_id
+            )
+            full_text = ""
+            for delta in stream:
+                full_text += delta
+                self.chunk_received.emit(full_text)
+            self.result_session_id = result[0] or self.result_session_id
+            self.finished.emit(full_text)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class ChatPanel(QWidget):
     def __init__(self, event_bus, parent=None):
         super().__init__(parent)
         self._event_bus = event_bus
-        self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self._session_id: str | None = None
         self._worker = None
 
         self._setup_ui()
@@ -155,6 +182,13 @@ class ChatPanel(QWidget):
         self._send_btn.setEnabled(enabled)
         self._input.setPlaceholderText("说点什么..." if enabled else "等待回复中...")
 
+    def _create_client(self) -> OpenClawClient | None:
+        url = config.get("server", "url")
+        token = config.get("server", "token")
+        if not url:
+            return None
+        return OpenClawClient(url, token or "")
+
     def _send(self):
         text = self._input.text().strip()
         if not text or self._worker is not None:
@@ -162,27 +196,25 @@ class ChatPanel(QWidget):
         self._input.clear()
 
         self._add_bubble(text, is_user=True)
-        self._messages.append({"role": "user", "content": text})
 
+        # Water keyword shortcut
         water_keywords = ("喝水", "提醒喝水", "drink water", "补水")
         if any(kw in text.lower() for kw in water_keywords):
             self._event_bus.water_reminder_triggered.emit()
             self._add_bubble("好的！已经提醒你喝水啦～记得补充水分哦", is_user=False)
-            self._messages.append({"role": "assistant", "content": "好的！已经提醒你喝水啦～记得补充水分哦"})
             return
 
-        provider = create_provider(config)
-        if not provider:
-            self._add_bubble("请先在设置中配置 API Key。", is_user=False)
+        client = self._create_client()
+        if not client:
+            self._add_bubble("请先在设置中配置服务器地址。", is_user=False)
             return
 
         self._set_input_enabled(False)
 
-        # 先创建空的 AI 气泡用于流式填充（直接用最大宽度，避免流式更新时宽度抖动）
         self._streaming_bubble = self._add_bubble("...", is_user=False)
         self._streaming_bubble.setFixedWidth(BUBBLE_MAX_WIDTH)
 
-        self._worker = ChatWorker(provider, list(self._messages))
+        self._worker = ServerChatWorker(client, text, self._session_id)
         self._worker.chunk_received.connect(self._on_chunk)
         self._worker.finished.connect(self._on_stream_done)
         self._worker.error.connect(self._on_error)
@@ -191,16 +223,16 @@ class ChatPanel(QWidget):
         self._event_bus.chat_request_sent.emit(text)
 
     def _on_chunk(self, text_so_far):
-        """流式更新气泡文字。"""
         if self._streaming_bubble:
             self._streaming_bubble.setText(text_so_far)
-            # 宽度已固定为 BUBBLE_MAX_WIDTH，只需重算高度
             self._streaming_bubble.adjustSize()
             QTimer.singleShot(10, self._scroll_to_bottom)
 
     def _on_stream_done(self, full_text):
-        self._messages.append({"role": "assistant", "content": full_text})
-        # 流式结束后，收缩气泡到实际文字宽度
+        # Update session_id from server response
+        if self._worker:
+            self._session_id = self._worker.result_session_id or self._session_id
+
         if self._streaming_bubble:
             fm = self._streaming_bubble.fontMetrics()
             text_width = fm.horizontalAdvance(full_text) + BUBBLE_PADDING
@@ -218,9 +250,6 @@ class ChatPanel(QWidget):
             self._streaming_bubble = None
         else:
             self._add_bubble(f"出错了: {err}", is_user=False)
-        # 出错时移除最后的 user 消息，避免上下文断裂
-        if self._messages and self._messages[-1]["role"] == "user":
-            self._messages.pop()
         self._worker = None
         self._set_input_enabled(True)
         self._input.setFocus()

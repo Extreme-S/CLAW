@@ -4,7 +4,8 @@ import feedparser
 from datetime import datetime, time as dtime
 from PyQt6.QtCore import QThread, QTimer, QTime, pyqtSignal, QObject
 
-from features.ai_chat import create_provider
+from core.api_client import OpenClawClient
+from core.config_manager import config as app_config
 
 
 class NewsWorker(QThread):
@@ -95,17 +96,19 @@ class NewsWorker(QThread):
         return articles
 
     def _generate_summary(self, articles):
-        provider = create_provider(self._config)
-        if not provider:
+        url = app_config.get("server", "url")
+        token = app_config.get("server", "token")
+        if not url:
             return
+        client = OpenClawClient(url, token or "")
         text = "\n".join(f"- {a['title']}: {a['summary']}" for a in articles[:10])
         prompt = f"请用中文简要总结以下AI相关新闻，提取最重要的3-5条，每条一句话：\n\n{text}"
         try:
-            result = provider.chat([
-                {"role": "system", "content": "你是一个AI新闻编辑，擅长用简洁的中文总结新闻。"},
-                {"role": "user", "content": prompt},
-            ])
-            self.summary_ready.emit(result)
+            result, stream = client.chat_stream(prompt)
+            full = ""
+            for delta in stream:
+                full += delta
+            self.summary_ready.emit(full)
         except Exception:
             pass
 

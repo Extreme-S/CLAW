@@ -1,5 +1,6 @@
 # Config with API keys
 config.yaml
+server/config.yaml
 
 # Python
 __pycache__/
@@ -10,6 +11,7 @@ venv/
 
 # Runtime data
 data/*.json
+server/data/
 
 # OS
 .DS_Store

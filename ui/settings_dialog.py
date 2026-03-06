@@ -45,7 +45,7 @@ class SettingsDialog(QDialog):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_general_tab(), "通用")
-        self._tabs.addTab(self._build_ai_tab(), "AI 服务")
+        self._tabs.addTab(self._build_ai_tab(), "服务器")
         self._tabs.addTab(self._build_water_tab(), "喝水提醒")
         self._tabs.addTab(self._build_news_tab(), "新闻源")
         layout.addWidget(self._tabs)
@@ -80,41 +80,17 @@ class SettingsDialog(QDialog):
         w = QWidget()
         layout = QVBoxLayout(w)
 
-        # Provider selection
-        provider_layout = QHBoxLayout()
-        provider_layout.addWidget(QLabel("AI 服务:"))
-        self._provider_combo = QComboBox()
-        self._provider_combo.addItems(["OpenAI", "Claude"])
-        provider_layout.addWidget(self._provider_combo)
-        provider_layout.addStretch()
-        layout.addLayout(provider_layout)
-
-        # OpenAI settings
-        openai_group = QGroupBox("OpenAI 设置")
-        openai_form = QFormLayout(openai_group)
-        self._openai_key = QLineEdit()
-        self._openai_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self._openai_key.setPlaceholderText("sk-...")
-        openai_form.addRow("API Key:", self._openai_key)
-        self._openai_model = QLineEdit()
-        self._openai_model.setPlaceholderText("gpt-4o-mini")
-        openai_form.addRow("模型:", self._openai_model)
-        self._openai_base_url = QLineEdit()
-        self._openai_base_url.setPlaceholderText("留空使用默认地址，或填入自定义地址")
-        openai_form.addRow("Base URL:", self._openai_base_url)
-        layout.addWidget(openai_group)
-
-        # Claude settings
-        claude_group = QGroupBox("Claude 设置")
-        claude_form = QFormLayout(claude_group)
-        self._claude_key = QLineEdit()
-        self._claude_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self._claude_key.setPlaceholderText("sk-ant-...")
-        claude_form.addRow("API Key:", self._claude_key)
-        self._claude_model = QLineEdit()
-        self._claude_model.setPlaceholderText("claude-sonnet-4-20250514")
-        claude_form.addRow("模型:", self._claude_model)
-        layout.addWidget(claude_group)
+        # Server connection
+        server_group = QGroupBox("OpenClaw 服务器")
+        server_form = QFormLayout(server_group)
+        self._server_url = QLineEdit()
+        self._server_url.setPlaceholderText("http://localhost:8000")
+        server_form.addRow("服务器地址:", self._server_url)
+        self._server_token = QLineEdit()
+        self._server_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self._server_token.setPlaceholderText("认证令牌")
+        server_form.addRow("Token:", self._server_token)
+        layout.addWidget(server_group)
 
         layout.addStretch()
         return w
@@ -176,14 +152,9 @@ class SettingsDialog(QDialog):
         self._lang_combo.setCurrentIndex(0 if lang == "zh" else 1)
         self._start_minimized.setChecked(config.get("general", "start_minimized") or False)
 
-        # AI
-        provider = config.get("ai", "provider")
-        self._provider_combo.setCurrentIndex(0 if provider == "openai" else 1)
-        self._openai_key.setText(config.get("ai", "openai_api_key") or "")
-        self._openai_model.setText(config.get("ai", "openai_model") or "")
-        self._openai_base_url.setText(config.get("ai", "openai_base_url") or "")
-        self._claude_key.setText(config.get("ai", "claude_api_key") or "")
-        self._claude_model.setText(config.get("ai", "claude_model") or "")
+        # Server
+        self._server_url.setText(config.get("server", "url") or "")
+        self._server_token.setText(config.get("server", "token") or "")
 
         # Water
         self._water_enabled.setChecked(config.get("water_reminder", "enabled") or False)
@@ -203,13 +174,9 @@ class SettingsDialog(QDialog):
         config.set("general", "language", "zh" if self._lang_combo.currentIndex() == 0 else "en")
         config.set("general", "start_minimized", self._start_minimized.isChecked())
 
-        # AI
-        config.set("ai", "provider", "openai" if self._provider_combo.currentIndex() == 0 else "claude")
-        config.set("ai", "openai_api_key", self._openai_key.text().strip())
-        config.set("ai", "openai_model", self._openai_model.text().strip() or "gpt-4o-mini")
-        config.set("ai", "openai_base_url", self._openai_base_url.text().strip())
-        config.set("ai", "claude_api_key", self._claude_key.text().strip())
-        config.set("ai", "claude_model", self._claude_model.text().strip() or "claude-sonnet-4-20250514")
+        # Server
+        config.set("server", "url", self._server_url.text().strip() or "http://localhost:8000")
+        config.set("server", "token", self._server_token.text().strip())
 
         # Water
         config.set("water_reminder", "enabled", self._water_enabled.isChecked())

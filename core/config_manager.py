@@ -4,6 +4,10 @@ import yaml
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
 
 DEFAULT_CONFIG = {
+    "server": {
+        "url": "http://localhost:8000",
+        "token": "claw-dev-token-2026",
+    },
     "general": {
         "language": "zh",
         "start_minimized": False,
